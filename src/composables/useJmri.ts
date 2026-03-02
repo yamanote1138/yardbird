@@ -540,6 +540,32 @@ export function useJmri() {
         acquiredAt: Date.now()
       }
       jmriState.value.throttles.set(address, throttle)
+
+      // After a short yield, read any function states JMRI sent as unsolicited
+      // updates following acquisition. jmri-client stores these in its internal
+      // throttle cache via the throttle:updated event; we sync them into our state.
+      setTimeout(() => {
+        const clientState = jmriClient?.getThrottleState(throttleId)
+        const fnMap = clientState?.functions
+        if (!(fnMap instanceof Map) || fnMap.size === 0) return
+
+        const currentThrottle = jmriState.value.throttles.get(address)
+        if (!currentThrottle) return
+
+        const updatedFunctions = { ...currentThrottle.functions }
+        let anyUpdated = false
+        for (const [key, value] of fnMap.entries()) {
+          if (updatedFunctions[key]) {
+            updatedFunctions[key] = { ...updatedFunctions[key], value: !!value }
+            anyUpdated = true
+          }
+        }
+
+        if (anyUpdated) {
+          jmriState.value.throttles.set(address, { ...currentThrottle, functions: updatedFunctions })
+          logger.debug(`Applied initial function states for ${rosterEntry.name}`)
+        }
+      }, 200)
     } catch (error) {
       logger.error(`Failed to acquire throttle for address ${address}:`, error)
       throw error

@@ -64,7 +64,6 @@ const statusClass = computed(() => {
     case ConnectionState.CONNECTED:
       return 'btn-success'
     case ConnectionState.DISCONNECTED:
-      return 'btn-danger'
     case ConnectionState.UNKNOWN:
       return 'btn-warning'
   }
@@ -114,8 +113,8 @@ const statusIcon = computed(() => {
 })
 
 const buttonClass = computed(() => {
-  if (power.value === PowerState.ON) return 'btn-success'
-  if (power.value === PowerState.OFF) return 'btn-danger'
+  if (power.value === PowerState.ON) return 'btn-primary'
+  if (power.value === PowerState.OFF) return 'btn-secondary'
   return 'btn-warning'  // UNKNOWN state
 })
 
@@ -174,11 +173,6 @@ function handleLogout() {
   color: #ffffff;
 }
 
-.status-indicator.btn-danger {
-  background-color: #dc3545;
-  border-color: #dc3545;
-  color: #ffffff;
-}
 
 .status-indicator.btn-warning {
   background-color: #ffc107;

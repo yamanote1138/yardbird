@@ -12,8 +12,8 @@
     <div class="sticky-header bg-dark">
       <div class="container-fluid py-2 py-sm-3 pb-2">
         <!-- Header -->
-        <h1 class="h5 h5-sm-4 mb-1">Trains Over the Interwebs</h1>
-        <p class="text-muted small mb-2 mb-sm-3">controlling {{ railroadName }}</p>
+        <h1 class="h5 h5-sm-4 mb-1">{{ railroadName }}</h1>
+        <p class="text-muted small mb-2 mb-sm-3">{{ connectionSubtitle }}</p>
 
         <!-- Power Control with integrated status -->
         <PowerControl @logout="handleLogout" />
@@ -33,7 +33,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/composables/useJmri'
 import { logger } from '@/utils/logger'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
@@ -46,6 +46,12 @@ const { initialize, disconnect, fetchRoster, isConnected, connectionState, railr
 
 const isInitialized = ref(false)
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
+const connectionHost = ref('')
+const connectionMock = ref(false)
+
+const connectionSubtitle = computed(() =>
+  connectionMock.value ? 'using mock data' : connectionHost.value
+)
 
 // Update page title when railroad name changes
 watch(railroadName, (newName) => {
@@ -78,6 +84,10 @@ const handleConnect = async (settings: ConnectionSettings) => {
       setupRef.value?.setError(message)
       disconnect()
     }
+
+    // Store connection info for display
+    connectionHost.value = `${settings.host}:${settings.port}`
+    connectionMock.value = settings.mockEnabled
 
     // Initialize JMRI client
     initialize(jmriSettings)

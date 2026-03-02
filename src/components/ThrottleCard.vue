@@ -47,16 +47,26 @@
           <i v-if="!throttle.directionVerified" class="fas fa-shuffle"></i>
           <i v-else-if="throttle.direction" class="fas fa-arrow-right"></i>
           <i v-else class="fas fa-arrow-left"></i>
-          <span v-if="!throttle.directionVerified">Unknown</span>
-          <span v-else>{{ throttle.direction ? 'Forward' : 'Reverse' }}</span>
+          <span v-if="!throttle.directionVerified" class="ms-1">Unknown</span>
+          <span v-else class="ms-1">{{ throttle.direction ? 'Forward' : 'Reverse' }}</span>
+        </button>
+        <button
+          type="button"
+          class="btn btn-warning col"
+          @click="brakeThrottle"
+          :disabled="controlsDisabled"
+        >
+          <i class="fas fa-gauge"></i>
+          <span class="ms-1">Brake</span>
         </button>
         <button
           type="button"
           class="btn btn-danger col"
-          @click="stopThrottle"
+          @click="emergencyStop"
           :disabled="controlsDisabled"
         >
-          <i class="fas fa-stop"></i> Stop
+          <i class="fas fa-circle-stop"></i>
+          <span class="ms-1">E-Stop</span>
         </button>
       </div>
 
@@ -66,7 +76,7 @@
           v-for="fn in functionButtons"
           :key="fn.key"
           class="btn"
-          :class="fn.value ? 'btn-warning' : 'btn-outline-secondary'"
+          :class="fn.value ? 'btn-info' : 'btn-fn-off'"
           @click="toggleFunction(fn.key)"
           :disabled="controlsDisabled"
           :title="fn.label"
@@ -95,7 +105,7 @@ const { isConnected, power, setThrottleSpeed, setThrottleDirection, setThrottleF
 
 const isReleasing = ref(false)
 const isRamping = ref(false)
-const emergencyStop = ref(false)
+const stopFlag = ref(false)
 const targetSpeed = ref<number | null>(null)
 
 // Power level buttons: 10 segments at 10% each
@@ -226,7 +236,7 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
   // If already at target, do nothing
   if (currentSpeed === targetSpeedValue) return
 
-  emergencyStop.value = false
+  stopFlag.value = false
   isRamping.value = true
   targetSpeed.value = clickedLevel // For visual feedback
 
@@ -237,7 +247,7 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
 
     for (let i = 1; i <= steps; i++) {
       // Check for emergency stop
-      if (emergencyStop.value) {
+      if (stopFlag.value) {
         await setThrottleSpeed(props.throttle.address, 0)
         break
       }
@@ -254,7 +264,7 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
     }
 
     // Ensure we hit the exact target (unless emergency stopped)
-    if (!emergencyStop.value) {
+    if (!stopFlag.value) {
       await setThrottleSpeed(props.throttle.address, targetSpeedValue)
     }
   } finally {
@@ -265,7 +275,10 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
 
 async function toggleDirection() {
   const currentSpeed = props.throttle.speed
-  const newDirection = props.throttle.direction === Direction.FORWARD ? Direction.REVERSE : Direction.FORWARD
+  // If direction is unknown, always set to Forward; otherwise toggle
+  const newDirection = props.throttle.directionVerified && props.throttle.direction === Direction.FORWARD
+    ? Direction.REVERSE
+    : Direction.FORWARD
 
   // If moving, ramp down to 0, pause, switch direction, then ramp back up
   if (currentSpeed > 0) {
@@ -289,10 +302,13 @@ async function toggleDirection() {
   }
 }
 
-function stopThrottle() {
-  // Set emergency stop flag to interrupt any ongoing ramping
-  emergencyStop.value = true
-  // Immediately set speed to 0
+async function brakeThrottle() {
+  await setPowerLevel(powerLevels[0], 0)
+}
+
+function emergencyStop() {
+  // Interrupt any ongoing ramp and set speed to 0 immediately
+  stopFlag.value = true
   setThrottleSpeed(props.throttle.address, 0)
 }
 
@@ -339,5 +355,14 @@ async function onRelease() {
 </script>
 
 <style scoped>
-/* Component-specific styles can go here if needed */
+.btn-fn-off {
+  background-color: #495057;
+  border-color: #495057;
+  color: #fff;
+}
+.btn-fn-off:hover:not(:disabled) {
+  background-color: #6c757d;
+  border-color: #6c757d;
+  color: #fff;
+}
 </style>

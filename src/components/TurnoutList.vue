@@ -58,14 +58,14 @@ const sortedTurnouts = computed(() => {
 function getTurnoutButtonClass(turnout: TurnoutData): string {
   switch (turnout.state) {
     case TurnoutState.CLOSED:
-      return 'btn-success'
+      return 'btn-primary'
     case TurnoutState.THROWN:
-      return 'btn-warning'
+      return 'btn-info'
     case TurnoutState.INCONSISTENT:
       return 'btn-danger'
     case TurnoutState.UNKNOWN:
     default:
-      return 'btn-secondary'
+      return 'btn-warning'
   }
 }
 
