@@ -1,10 +1,10 @@
-# Trains Over the Interwebs - Project Guide
+# Trains on the Interwebs (TOTI) - Project Guide
 
 This file contains project conventions, architecture decisions, and development standards for maintaining consistency across Claude sessions.
 
 ## Project Overview
 
-**Trains Over the Interwebs** is a modern web-based control system for JMRI (Java Model Railroad Interface) operations. It's a single-page application (SPA) that provides real-time control of model railroad equipment through a responsive web interface.
+**Trains on the Interwebs (TOTI)** is a modern web-based control system for JMRI (Java Model Railroad Interface) operations. It's a single-page application (SPA) that provides real-time control of model railroad equipment through a responsive web interface.
 
 ### Tech Stack
 - **Vue 3** with Composition API and TypeScript

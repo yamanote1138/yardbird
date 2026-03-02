@@ -4,7 +4,7 @@
     <div class="sticky-header bg-dark">
       <div class="container-fluid py-2 py-sm-3 pb-2">
         <!-- Header -->
-        <h1 class="h5 h5-sm-4 mb-1">Trains Over the Interwebs</h1>
+        <h1 class="h5 h5-sm-4 mb-1">Trains on the Interwebs</h1>
         <p class="text-muted small mb-2 mb-sm-3">control your JMRI-based layout</p>
       </div>
       <hr class="divider m-0">

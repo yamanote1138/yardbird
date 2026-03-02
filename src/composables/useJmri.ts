@@ -35,6 +35,7 @@ const jmriState = ref<JmriState>({
 const connectionState = ref<ConnectionState>(ConnectionState.DISCONNECTED)
 const isServerOnline = ref<boolean>(true) // Browser/web server connectivity
 const railroadName = ref<string>('Model Railroad')
+const jmriVersion = ref<string>('')
 let jmriClient: any = null
 let currentSettings: JmriConnectionSettings | null = null
 const throttleIds = new Map<number, string>() // address -> throttleId mapping
@@ -105,10 +106,13 @@ export function useJmri() {
     })
 
     jmriClient.on('hello', (data: any) => {
-      // JMRI server uses lowercase 'railroad'
       if (data?.railroad) {
         railroadName.value = data.railroad
         logger.info('Railroad name:', railroadName.value)
+      }
+      if (data?.JMRI) {
+        jmriVersion.value = data.JMRI
+        logger.info('JMRI version:', jmriVersion.value)
       }
     })
 
@@ -754,6 +758,7 @@ export function useJmri() {
     jmriState.value.turnouts.clear()
     jmriState.value.power = 0
     railroadName.value = 'Model Railroad'
+    jmriVersion.value = ''
   }
 
   return {
@@ -762,6 +767,7 @@ export function useJmri() {
     connectionState,
     isServerOnline,
     railroadName,
+    jmriVersion,
 
     // Computed
     isConnected: computed(() => connectionState.value === ConnectionState.CONNECTED),

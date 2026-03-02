@@ -1,4 +1,4 @@
-# Trains Over the Interwebs
+# Trains on the Interwebs (TOTI)
 
 Modern web-based control system for JMRI model railroad operations.
 

@@ -35,6 +35,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/composables/useJmri'
+import { version as appVersion } from '../package.json'
 import { logger } from '@/utils/logger'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
 import PowerControl from '@/components/PowerControl.vue'
@@ -42,16 +43,21 @@ import ThrottleList from '@/components/ThrottleList.vue'
 import TurnoutList from '@/components/TurnoutList.vue'
 import type { ConnectionSettings } from '@/components/ConnectionSetup.vue'
 
-const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName } = useJmri()
+const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
 
 const isInitialized = ref(false)
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 const connectionHost = ref('')
 const connectionMock = ref(false)
 
-const connectionSubtitle = computed(() =>
-  connectionMock.value ? 'using mock data' : connectionHost.value
-)
+const connectionSubtitle = computed(() => {
+  const parts = [
+    connectionMock.value ? 'mock data' : connectionHost.value,
+    jmriVersion.value ? `JMRI ${jmriVersion.value}` : '',
+    `TOTI v${appVersion}`
+  ]
+  return parts.filter(Boolean).join(' | ')
+})
 
 // Update page title when railroad name changes
 watch(railroadName, (newName) => {
@@ -161,7 +167,7 @@ const handleLogout = () => {
   logger.info('Logging out')
   disconnect()
   isInitialized.value = false
-  document.title = 'Trains Over the Interwebs'
+  document.title = 'TOTI'
 }
 </script>
 
