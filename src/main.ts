@@ -1,13 +1,12 @@
 import { createApp } from 'vue'
+import ui from '@nuxt/ui/vue-plugin'
 import App from './App.vue'
 
-// Bootstrap CSS (no JavaScript needed)
-import 'bootstrap/dist/css/bootstrap.min.css'
-
-// Custom styles
-import '@/assets/styles/main.scss'
+import './main.css'
 
 const app = createApp(App)
+
+app.use(ui)
 
 // Global error handler
 app.config.errorHandler = (err, instance, info) => {

@@ -2,28 +2,32 @@
   <div>
     <!-- Turnouts Section -->
     <div v-if="sortedTurnouts.length > 0">
-      <div class="d-flex flex-wrap gap-2">
-        <button
+      <div class="flex flex-wrap gap-2">
+        <UButton
           v-for="turnout in sortedTurnouts"
           :key="turnout.name"
-          type="button"
-          class="btn btn-sm"
-          :class="getTurnoutButtonClass(turnout)"
+          size="sm"
+          :color="getTurnoutButtonColor(turnout)"
+          :loading="changingTurnouts.has(turnout.name)"
+          :disabled="controlsDisabled"
           @click="handleToggle(turnout.name)"
-          :disabled="controlsDisabled || changingTurnouts.has(turnout.name)"
         >
-          <i v-if="!changingTurnouts.has(turnout.name)" class="fas" :class="getTurnoutIcon(turnout.state)"></i>
-          <i v-else class="fas fa-spinner fa-spin"></i>
-          <span class="ms-1">{{ turnout.userName || turnout.name }}</span>
-        </button>
+          <template #leading>
+            <UIcon v-if="!changingTurnouts.has(turnout.name)" :name="getTurnoutIcon(turnout.state)" />
+          </template>
+          {{ turnout.userName || turnout.name }}
+        </UButton>
       </div>
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="isConnected" class="alert alert-info mt-3 small">
-      <i class="fas fa-info-circle"></i>
-      No turnouts configured. Add turnouts in JMRI to see them here.
-    </div>
+    <UAlert
+      v-else-if="isConnected"
+      color="info"
+      icon="i-heroicons-information-circle"
+      title="No turnouts configured. Add turnouts in JMRI to see them here."
+      class="mt-3 text-sm"
+    />
   </div>
 </template>
 
@@ -52,31 +56,31 @@ const sortedTurnouts = computed(() => {
   })
 })
 
-function getTurnoutButtonClass(turnout: TurnoutData): string {
+function getTurnoutButtonColor(turnout: TurnoutData): string {
   switch (turnout.state) {
     case TurnoutState.CLOSED:
-      return 'btn-primary'
+      return 'primary'
     case TurnoutState.THROWN:
-      return 'btn-info'
+      return 'info'
     case TurnoutState.INCONSISTENT:
-      return 'btn-danger'
+      return 'error'
     case TurnoutState.UNKNOWN:
     default:
-      return 'btn-warning'
+      return 'warning'
   }
 }
 
 function getTurnoutIcon(state: TurnoutState): string {
   switch (state) {
     case TurnoutState.CLOSED:
-      return 'fa-right-left'
+      return 'i-heroicons-arrows-right-left'
     case TurnoutState.THROWN:
-      return 'fa-shuffle'
+      return 'i-mdi-shuffle-variant'
     case TurnoutState.INCONSISTENT:
-      return 'fa-triangle-exclamation'
+      return 'i-heroicons-exclamation-triangle'
     case TurnoutState.UNKNOWN:
     default:
-      return 'fa-circle-question'
+      return 'i-heroicons-question-mark-circle'
   }
 }
 

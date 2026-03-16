@@ -1,20 +1,20 @@
 <template>
   <div
-    class="d-flex align-items-center loco-header"
+    class="flex items-center loco-header"
     :class="{ 'disabled': disabled, 'compact': compact }"
     @click="!disabled && $emit('click')"
   >
     <img
       :src="imageSrc"
       :alt="name"
-      class="loco-thumbnail me-3"
+      class="loco-thumbnail mr-3"
       @error="onImageError"
     >
-    <div class="flex-grow-1">
-      <h5 class="card-title mb-0">{{ name }}</h5>
+    <div class="flex-1 min-w-0">
+      <h5 class="font-semibold mb-0 text-white">{{ name }}</h5>
       <small
-        class="text-muted"
-        :class="{ 'd-none d-sm-block': compact }"
+        class="text-neutral-400"
+        :class="{ 'hidden sm:block': compact }"
         v-if="road || number"
       >
         {{ road }} {{ number ? `#${number}` : '' }}

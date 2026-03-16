@@ -1,23 +1,21 @@
 <template>
-  <div class="card bg-dark text-light mb-2 mb-sm-3">
-    <div class="card-body py-2 py-sm-3">
-      <LocomotiveHeader
-        :name="entry.name"
-        :road="entry.road"
-        :number="entry.number"
-        :thumbnail-url="entry.thumbnailUrl"
-        :disabled="acquireDisabled"
-        :compact="true"
-        @click="onAcquire"
-      >
-        <template #status>
-          <div v-if="isAcquiring" class="text-warning small mt-1">
-            <i class="fas fa-spinner fa-spin"></i> Acquiring...
-          </div>
-        </template>
-      </LocomotiveHeader>
-    </div>
-  </div>
+  <UCard class="mb-2 sm:mb-3" :ui="{ body: 'py-2 sm:py-3' }">
+    <LocomotiveHeader
+      :name="entry.name"
+      :road="entry.road"
+      :number="entry.number"
+      :thumbnail-url="entry.thumbnailUrl"
+      :disabled="acquireDisabled"
+      :compact="true"
+      @click="onAcquire"
+    >
+      <template #status>
+        <div v-if="isAcquiring" class="text-amber-400 text-sm mt-1">
+          <UIcon name="i-heroicons-arrow-path" class="animate-spin" /> Acquiring...
+        </div>
+      </template>
+    </LocomotiveHeader>
+  </UCard>
 </template>
 
 <script setup lang="ts">
@@ -49,7 +47,3 @@ async function onAcquire() {
   }
 }
 </script>
-
-<style scoped>
-/* Component-specific styles can go here if needed */
-</style>

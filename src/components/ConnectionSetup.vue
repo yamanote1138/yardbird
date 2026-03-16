@@ -1,132 +1,134 @@
 <template>
-  <div class="min-vh-100 bg-dark text-light">
+  <div class="min-h-screen bg-neutral-950 text-white">
     <!-- Sticky Header Section -->
-    <div class="sticky-header bg-dark">
-      <div class="container-fluid py-2 py-sm-3 pb-2">
+    <div class="sticky top-0 z-[1000] bg-neutral-950 shadow-md">
+      <div class="px-4 py-2 sm:py-3 pb-2">
         <!-- Header -->
-        <h1 class="h5 h5-sm-4 mb-1">Trains on the Interwebs</h1>
-        <p class="text-muted small mb-2 mb-sm-3">control your JMRI-based layout</p>
+        <h1 class="text-lg font-semibold mb-1">Trains on the Interwebs</h1>
+        <p class="text-neutral-400 text-sm mb-2 sm:mb-3">control your JMRI-based layout</p>
       </div>
-      <hr class="divider m-0">
+      <hr class="border-white/10 m-0">
     </div>
 
     <!-- Setup Form Content -->
-    <div class="container-fluid px-3 pt-3">
-      <div class="row justify-content-center">
-        <div class="col-12 col-md-8 col-lg-6">
+    <div class="px-4 pt-3">
+      <div class="flex justify-center">
+        <div class="w-full md:max-w-2xl lg:max-w-xl">
           <form @submit.prevent="handleConnect">
             <!-- JMRI Server Settings -->
-            <div class="settings-panel">
-              <div class="mb-3">
-                <label for="server" class="form-label">JMRI Server</label>
-                <input
-                  type="text"
-                  class="form-control form-control-dark"
+            <div class="p-4 bg-white/5 rounded-md mb-4">
+              <div class="mb-4">
+                <label for="server" class="block text-sm font-medium mb-1">JMRI Server</label>
+                <UInput
                   id="server"
                   v-model="serverAddress"
                   placeholder="raspi-jmri.local:12080"
                   :required="!settings.mockEnabled"
                   :disabled="settings.mockEnabled"
-                >
-                <small class="form-text text-muted">
+                  size="lg"
+                />
+                <small class="text-neutral-400 text-xs mt-1 block">
                   Host and port (e.g., raspi-jmri.local:12080 or 192.168.1.100:12080)
                 </small>
               </div>
             </div>
 
             <!-- Secure (WSS) -->
-            <div class="mb-3">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="secure"
-                  v-model="settings.secure"
-                  :disabled="settings.mockEnabled"
-                >
-                <label class="form-check-label" for="secure">
-                  <i class="fas fa-shield-halved me-1"></i>
-                  Secure Connection (WSS)
-                </label>
-                <small class="form-text text-muted d-block ms-4">
-                  Use encrypted WebSocket connection
-                </small>
-              </div>
+            <div class="mb-4">
+              <UCheckbox
+                id="secure"
+                v-model="settings.secure"
+                :disabled="settings.mockEnabled"
+              >
+                <template #label>
+                  <span class="flex items-center gap-1">
+                    <UIcon name="i-heroicons-shield-check" />
+                    Secure Connection (WSS)
+                  </span>
+                </template>
+              </UCheckbox>
+              <small class="text-neutral-400 text-xs block ml-6 mt-1">
+                Use encrypted WebSocket connection
+              </small>
             </div>
 
             <!-- Demo Mode -->
-            <div class="mb-3">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="demo"
-                  v-model="settings.mockEnabled"
-                >
-                <label class="form-check-label" for="demo">
-                  <i class="fas fa-vial me-1"></i>
-                  Demo Mode
-                </label>
-                <small class="form-text text-muted d-block ms-4">
-                  No hardware required - uses simulated data
-                </small>
-              </div>
+            <div class="mb-4">
+              <UCheckbox
+                id="demo"
+                v-model="settings.mockEnabled"
+              >
+                <template #label>
+                  <span class="flex items-center gap-1">
+                    <UIcon name="i-mdi-test-tube" />
+                    Demo Mode
+                  </span>
+                </template>
+              </UCheckbox>
+              <small class="text-neutral-400 text-xs block ml-6 mt-1">
+                No hardware required - uses simulated data
+              </small>
             </div>
 
             <!-- Debug Logging -->
-            <div class="mb-3">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="debug"
-                  v-model="settings.debugEnabled"
-                >
-                <label class="form-check-label" for="debug">
-                  <i class="fas fa-bug me-1"></i>
-                  Enable Debug Logging
-                </label>
-                <small class="form-text text-muted d-block ms-4">
-                  Show detailed logs in console
-                </small>
-              </div>
+            <div class="mb-4">
+              <UCheckbox
+                id="debug"
+                v-model="settings.debugEnabled"
+              >
+                <template #label>
+                  <span class="flex items-center gap-1">
+                    <UIcon name="i-mdi-bug" />
+                    Enable Debug Logging
+                  </span>
+                </template>
+              </UCheckbox>
+              <small class="text-neutral-400 text-xs block ml-6 mt-1">
+                Show detailed logs in console
+              </small>
             </div>
 
             <!-- Remember Settings -->
-            <div class="mb-4">
-              <div class="form-check">
-                <input
-                  class="form-check-input"
-                  type="checkbox"
-                  id="remember"
-                  v-model="rememberSettings"
-                >
-                <label class="form-check-label" for="remember">
-                  <i class="fas fa-floppy-disk me-1"></i>
-                  Remember these settings
-                </label>
-                <small class="form-text text-muted d-block ms-4">
-                  Save settings in browser for next time
-                </small>
-              </div>
+            <div class="mb-6">
+              <UCheckbox
+                id="remember"
+                v-model="rememberSettings"
+              >
+                <template #label>
+                  <span class="flex items-center gap-1">
+                    <UIcon name="i-mdi-floppy" />
+                    Remember these settings
+                  </span>
+                </template>
+              </UCheckbox>
+              <small class="text-neutral-400 text-xs block ml-6 mt-1">
+                Save settings in browser for next time
+              </small>
             </div>
 
             <!-- Error Message -->
-            <div v-if="errorMessage" class="alert alert-danger mb-3">
-              <i class="fas fa-triangle-exclamation me-2"></i>
-              {{ errorMessage }}
-            </div>
+            <UAlert
+              v-if="errorMessage"
+              color="error"
+              icon="i-heroicons-exclamation-triangle"
+              :title="errorMessage"
+              class="mb-4"
+            />
 
             <!-- Connect Button -->
-            <button
+            <UButton
               type="submit"
-              class="btn btn-success btn-lg w-100"
+              color="success"
+              size="xl"
+              block
+              :loading="isConnecting"
               :disabled="isConnecting"
             >
-              <span v-if="isConnecting" class="spinner-border spinner-border-sm me-2"></span>
-              <i v-else class="fas fa-plug-circle-bolt me-2"></i>
+              <template v-if="!isConnecting" #leading>
+                <UIcon name="i-mdi-power-plug" />
+              </template>
               {{ isConnecting ? 'Connecting...' : 'Connect' }}
-            </button>
+            </UButton>
           </form>
         </div>
       </div>
@@ -199,7 +201,6 @@ const handleConnect = () => {
   // Parse server address to ensure host and port are set
   const parts = serverAddress.value.split(':')
   if (parts.length < 2) {
-    // If no port specified, use default
     settings.value.port = 12080
   }
 
@@ -207,7 +208,6 @@ const handleConnect = () => {
   if (rememberSettings.value) {
     localStorage.setItem('jmri-connection-settings', JSON.stringify(settings.value))
   } else {
-    // Clear saved settings if remember is unchecked
     localStorage.removeItem('jmri-connection-settings')
   }
 
@@ -230,57 +230,3 @@ defineExpose({
   }
 })
 </script>
-
-<style scoped>
-.sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.divider {
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  opacity: 0.5;
-}
-
-.form-control-dark {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-color: rgba(255, 255, 255, 0.2);
-  color: #fff;
-}
-
-.form-control-dark:focus {
-  background-color: rgba(255, 255, 255, 0.08);
-  border-color: var(--bs-primary);
-  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
-  color: #fff;
-}
-
-.form-control-dark::placeholder {
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.form-control-dark:disabled {
-  background-color: rgba(255, 255, 255, 0.02);
-  border-color: rgba(255, 255, 255, 0.1);
-  color: rgba(255, 255, 255, 0.4);
-  cursor: not-allowed;
-}
-
-.settings-panel {
-  padding: 1rem;
-  background-color: rgba(255, 255, 255, 0.03);
-  border-radius: 0.375rem;
-  margin-bottom: 1rem;
-}
-
-/* Smaller buttons on mobile for vertical space savings */
-@media (max-width: 575px) {
-  .btn-group .btn {
-    padding: 0.375rem 0.5rem;
-    font-size: 0.875rem;
-  }
-}
-</style>

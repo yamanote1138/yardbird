@@ -13,16 +13,18 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "bootstrap": "^5.3.3",
+    "@nuxt/ui": "^4.5.1",
     "events": "^3.3.0",
     "jmri-client": "^3.7.1",
-    "vue": "^3.5.13"
+    "tailwindcss": "^4.2.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.6.4"
   },
   "devDependencies": {
+    "@iconify-json/mdi": "^1.2.3",
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/tsconfig": "^0.5.1",
     "playwright": "^1.58.2",
-    "sass": "^1.83.4",
     "typescript": "^5.7.2",
     "vite": "^6.0.6",
     "vue-tsc": "^2.1.10"

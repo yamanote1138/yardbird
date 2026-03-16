@@ -1,92 +1,97 @@
 <template>
-  <div class="card bg-dark text-light mb-2 mb-sm-3">
-    <div class="card-body py-2 py-sm-3">
-      <div class="mb-2 mb-sm-3">
-        <LocomotiveHeader
-          :name="throttle.name"
-          :road="throttle.road"
-          :number="throttle.number"
-          :thumbnail-url="throttle.thumbnailUrl"
-          :disabled="!isConnected || isReleasing"
-          @click="onRelease"
-        >
-          <template #status>
-            <div v-if="isReleasing" class="text-danger small mt-1">
-              <i class="fas fa-spinner fa-spin"></i> Releasing...
-            </div>
-          </template>
-        </LocomotiveHeader>
-      </div>
+  <UCard class="mb-2 sm:mb-3" :ui="{ body: 'py-2 sm:py-3' }">
+    <div class="mb-2 sm:mb-3">
+      <LocomotiveHeader
+        :name="throttle.name"
+        :road="throttle.road"
+        :number="throttle.number"
+        :thumbnail-url="throttle.thumbnailUrl"
+        :disabled="!isConnected || isReleasing"
+        @click="onRelease"
+      >
+        <template #status>
+          <div v-if="isReleasing" class="text-red-400 text-sm mt-1">
+            <UIcon name="i-heroicons-arrow-path" class="animate-spin" /> Releasing...
+          </div>
+        </template>
+      </LocomotiveHeader>
+    </div>
 
-      <!-- Speed control -->
-      <div class="mb-2 mb-sm-3">
-        <label class="form-label small mb-1">Speed: {{ Math.round(throttle.speed * 100) }}%</label>
-        <div class="btn-group w-100 gap-1" role="group" aria-label="Speed control">
-          <button
-            v-for="(level, index) in powerLevels"
-            :key="level"
-            class="btn"
-            :class="getSpeedButtonClass(level, index)"
-            @click="setPowerLevel(level, index)"
-            :disabled="controlsDisabled"
-          >
-            &nbsp;
-          </button>
-        </div>
-      </div>
-
-      <!-- Direction and Stop buttons -->
-      <div class="btn-group w-100 mb-2 mb-sm-3" role="group" aria-label="Direction and stop controls">
+    <!-- Speed control -->
+    <div class="mb-2 sm:mb-3">
+      <label class="text-sm mb-1 block text-neutral-300">Speed: {{ Math.round(throttle.speed * 100) }}%</label>
+      <div class="flex w-full gap-1" role="group" aria-label="Speed control">
         <button
-          type="button"
-          class="btn col"
-          :class="throttle.directionVerified ? 'btn-primary' : 'btn-warning'"
-          @click="toggleDirection"
+          v-for="(level, index) in powerLevels"
+          :key="level"
+          class="speed-segment flex-1 h-8 rounded transition-colors"
+          :class="getSpeedButtonClass(level, index)"
+          @click="setPowerLevel(level, index)"
           :disabled="controlsDisabled"
         >
-          <i v-if="!throttle.directionVerified" class="fas fa-shuffle"></i>
-          <i v-else-if="throttle.direction" class="fas fa-arrow-right"></i>
-          <i v-else class="fas fa-arrow-left"></i>
-          <span v-if="!throttle.directionVerified" class="ms-1">Unknown</span>
-          <span v-else class="ms-1">{{ throttle.direction ? 'Forward' : 'Reverse' }}</span>
-        </button>
-        <button
-          type="button"
-          class="btn btn-warning col"
-          @click="brakeThrottle"
-          :disabled="controlsDisabled"
-        >
-          <i class="fas fa-gauge"></i>
-          <span class="ms-1">Brake</span>
-        </button>
-        <button
-          type="button"
-          class="btn btn-danger col"
-          @click="emergencyStop"
-          :disabled="controlsDisabled"
-        >
-          <i class="fas fa-circle-stop"></i>
-          <span class="ms-1">E-Stop</span>
-        </button>
-      </div>
-
-      <!-- Function buttons -->
-      <div v-if="functionButtons.length > 0" class="btn-group w-100 flex-wrap" role="group">
-        <button
-          v-for="fn in functionButtons"
-          :key="fn.key"
-          class="btn"
-          :class="fn.value ? 'btn-info' : 'btn-fn-off'"
-          @click="toggleFunction(fn.key)"
-          :disabled="controlsDisabled"
-          :title="fn.label"
-        >
-          <i :class="getFunctionIcon(fn.key)"></i>
-          <span class="d-none d-sm-inline ms-1">{{ fn.label }}</span>
+          &nbsp;
         </button>
       </div>
     </div>
-  </div>
+
+    <!-- Direction and Stop buttons -->
+    <div class="flex w-full gap-1 mb-2 sm:mb-3" role="group" aria-label="Direction and stop controls">
+      <UButton
+        class="flex-1"
+        :color="throttle.directionVerified ? 'primary' : 'warning'"
+        @click="toggleDirection"
+        :disabled="controlsDisabled"
+      >
+        <template #leading>
+          <UIcon v-if="!throttle.directionVerified" name="i-mdi-shuffle-variant" />
+          <UIcon v-else-if="throttle.direction" name="i-heroicons-arrow-right" />
+          <UIcon v-else name="i-heroicons-arrow-left" />
+        </template>
+        <span v-if="!throttle.directionVerified">Unknown</span>
+        <span v-else>{{ throttle.direction ? 'Forward' : 'Reverse' }}</span>
+      </UButton>
+      <UButton
+        class="flex-1"
+        color="warning"
+        @click="brakeThrottle"
+        :disabled="controlsDisabled"
+      >
+        <template #leading>
+          <UIcon name="i-mdi-gauge" />
+        </template>
+        Brake
+      </UButton>
+      <UButton
+        class="flex-1"
+        color="error"
+        @click="emergencyStop"
+        :disabled="controlsDisabled"
+      >
+        <template #leading>
+          <UIcon name="i-heroicons-stop-circle" />
+        </template>
+        E-Stop
+      </UButton>
+    </div>
+
+    <!-- Function buttons -->
+    <div v-if="functionButtons.length > 0" class="flex flex-wrap gap-1" role="group">
+      <UButton
+        v-for="fn in functionButtons"
+        :key="fn.key"
+        :color="fn.value ? 'info' : 'neutral'"
+        :variant="fn.value ? 'solid' : 'soft'"
+        @click="toggleFunction(fn.key)"
+        :disabled="controlsDisabled"
+        :title="fn.label"
+      >
+        <template #leading>
+          <UIcon :name="getFunctionIcon(fn.key)" />
+        </template>
+        <span class="hidden sm:inline">{{ fn.label }}</span>
+      </UButton>
+    </div>
+  </UCard>
 </template>
 
 <script setup lang="ts">
@@ -119,53 +124,45 @@ const controlsDisabled = computed(() => {
 
 /**
  * Determine speed button styling based on current speed position
- * - Speed >= segment target: bright (reached this segment)
- * - Speed between previous and current segment: dim (approaching this segment)
- * - Speed below previous segment: grey (not reached yet)
- *
- * Color zones:
- * - Segments 1-3 (10-30%): RED
- * - Segments 4-7 (40-70%): YELLOW
- * - Segments 8-10 (80-100%): GREEN
+ * Color zones: Red (1-3), Amber (4-7), Green (8-10)
  */
 function getSpeedButtonClass(level: number, index: number): string {
   const currentSpeed = props.throttle.speed
 
-  // Determine color zone based on index
-  let colorClass: string
+  // Determine color zone
+  let reached: string
+  let approaching: string
   if (index <= 2) {
-    // First 3 segments: RED
-    colorClass = 'btn-danger'
+    reached = 'bg-red-600'
+    approaching = 'bg-red-600/50'
   } else if (index <= 6) {
-    // Middle 4 segments: YELLOW
-    colorClass = 'btn-warning'
+    reached = 'bg-amber-500'
+    approaching = 'bg-amber-500/50'
   } else {
-    // Last 3 segments: GREEN
-    colorClass = 'btn-success'
+    reached = 'bg-green-600'
+    approaching = 'bg-green-600/50'
   }
 
-  // Determine previous segment threshold (0 for first segment)
   const previousLevel = index > 0 ? powerLevels[index - 1] : 0
 
   // Reached or passed this segment: BRIGHT
   if (currentSpeed >= level) {
-    return colorClass
+    return reached
   }
 
   // Between previous and this segment: DIM (approaching)
   if (currentSpeed > previousLevel) {
-    return `${colorClass} opacity-50`
+    return approaching
   }
 
   // Below previous segment: GREY (not reached yet)
-  return 'btn-secondary'
+  return 'bg-neutral-700'
 }
 
 // Compute function buttons list (sorted by function number)
 const functionButtons = computed(() => {
   const buttons = Object.entries(props.throttle.functions)
     .map(([key, fn]) => {
-      // Extract function number from key like "F0", "F1"
       const match = key.match(/^F(\d+)$/)
       if (!match) return null
 
@@ -178,23 +175,17 @@ const functionButtons = computed(() => {
     })
     .filter((btn): btn is NonNullable<typeof btn> => btn !== null)
 
-  // Sort by function number
   return buttons.sort((a, b) => a.number - b.number)
 })
 
 /**
  * Set power level with segment-based ramping
- * - Each segment = 2 seconds ramp time
- * - Clicking unlit: ramp from leftmost lit to clicked (sum of segments traversed)
- * - Clicking lit: ramp from rightmost lit to segment left of clicked
- * - Clicking first lit segment: ramp to 0%
  */
 async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
   if (isRamping.value) return
 
   const currentSpeed = props.throttle.speed
 
-  // Find leftmost and rightmost lit segments
   let leftmostLitIndex = -1
   let rightmostLitIndex = -1
 
@@ -205,65 +196,52 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
     }
   }
 
-  // Determine if clicking lit or unlit segment
   const isSegmentLit = currentSpeed >= clickedLevel
 
   let targetSpeedValue: number
   let segmentDistance: number
 
   if (isSegmentLit) {
-    // Clicking a lit segment - ramp DOWN
     if (clickedIndex === 0) {
-      // Special case: clicking first segment goes to 0
       targetSpeedValue = 0
-      // Distance is all currently lit segments
       segmentDistance = rightmostLitIndex + 1
     } else {
-      // Target is the segment to the left of clicked
       const targetIndex = clickedIndex - 1
       targetSpeedValue = powerLevels[targetIndex]
-      // Distance from rightmost lit to target
       segmentDistance = rightmostLitIndex - targetIndex
     }
   } else {
-    // Clicking an unlit segment - ramp UP
     targetSpeedValue = clickedLevel
-    // Distance from leftmost lit (or 0 if none lit) to clicked
     const fromIndex = leftmostLitIndex === -1 ? -1 : leftmostLitIndex
     segmentDistance = clickedIndex - fromIndex
   }
 
-  // If already at target, do nothing
   if (currentSpeed === targetSpeedValue) return
 
   stopFlag.value = false
   isRamping.value = true
-  targetSpeed.value = clickedLevel // For visual feedback
+  targetSpeed.value = clickedLevel
 
   try {
     const duration = segmentDistance * RAMP_TIME_PER_SEGMENT
-    const interval = 100 // ms between updates - smooth animation
+    const interval = 100
     const steps = Math.max(5, Math.ceil(duration / interval))
 
     for (let i = 1; i <= steps; i++) {
-      // Check for emergency stop
       if (stopFlag.value) {
         await setThrottleSpeed(props.throttle.address, 0)
         break
       }
 
-      // Linear interpolation for consistent segment timing
       const t = i / steps
       const speed = currentSpeed + (targetSpeedValue - currentSpeed) * t
       await setThrottleSpeed(props.throttle.address, speed)
 
-      // Don't wait after the last step
       if (i < steps) {
         await new Promise(resolve => setTimeout(resolve, interval))
       }
     }
 
-    // Ensure we hit the exact target (unless emergency stopped)
     if (!stopFlag.value) {
       await setThrottleSpeed(props.throttle.address, targetSpeedValue)
     }
@@ -275,29 +253,17 @@ async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
 
 async function toggleDirection() {
   const currentSpeed = props.throttle.speed
-  // If direction is unknown, always set to Forward; otherwise toggle
   const newDirection = props.throttle.directionVerified && props.throttle.direction === Direction.FORWARD
     ? Direction.REVERSE
     : Direction.FORWARD
 
-  // If moving, ramp down to 0, pause, switch direction, then ramp back up
   if (currentSpeed > 0) {
-    // Find the index of the current speed level
     const currentIndex = powerLevels.findIndex(level => Math.abs(level - currentSpeed) < 0.01) || 0
-
-    // Ramp down to 0 by clicking first segment
     await setPowerLevel(powerLevels[0], 0)
-
-    // Pause after stopping (realistic momentum/settling time)
     await new Promise(resolve => setTimeout(resolve, 1800))
-
-    // Switch direction
     await setThrottleDirection(props.throttle.address, newDirection)
-
-    // Ramp back up to previous speed
     await setPowerLevel(currentSpeed, currentIndex)
   } else {
-    // If stopped, just switch direction
     await setThrottleDirection(props.throttle.address, newDirection)
   }
 }
@@ -307,7 +273,6 @@ async function brakeThrottle() {
 }
 
 function emergencyStop() {
-  // Interrupt any ongoing ramp and set speed to 0 immediately
   stopFlag.value = true
   setThrottleSpeed(props.throttle.address, 0)
 }
@@ -316,7 +281,6 @@ function toggleFunction(functionKey: string) {
   const fn = props.throttle.functions[functionKey]
   if (!fn) return
 
-  // Extract function number from key like "F0", "F1"
   const match = functionKey.match(/^F(\d+)$/)
   if (!match) {
     console.error('Invalid function key format:', functionKey)
@@ -329,19 +293,18 @@ function toggleFunction(functionKey: string) {
 
 function getFunctionIcon(functionKey: string): string {
   const fn = props.throttle.functions[functionKey]
-  if (!fn || !fn.label || typeof fn.label !== 'string') return 'fas fa-circle'
+  if (!fn || !fn.label || typeof fn.label !== 'string') return 'i-mdi-circle'
 
-  // Map common function labels to icons
   const label = fn.label.toLowerCase()
-  if (label.includes('headlight') || label.includes('light')) return 'fas fa-lightbulb'
-  if (label.includes('bell')) return 'fas fa-bell'
-  if (label.includes('horn') || label.includes('whistle')) return 'fas fa-bullhorn'
-  if (label.includes('steam')) return 'fas fa-cloud'
-  if (label.includes('brake')) return 'fas fa-hand-paper'
-  if (label.includes('coupler')) return 'fas fa-link'
-  if (label.includes('mars')) return 'fas fa-star'
+  if (label.includes('headlight') || label.includes('light')) return 'i-heroicons-light-bulb'
+  if (label.includes('bell')) return 'i-heroicons-bell'
+  if (label.includes('horn') || label.includes('whistle')) return 'i-mdi-bullhorn'
+  if (label.includes('steam')) return 'i-heroicons-cloud'
+  if (label.includes('brake')) return 'i-mdi-hand-back-left'
+  if (label.includes('coupler')) return 'i-heroicons-link'
+  if (label.includes('mars')) return 'i-heroicons-star'
 
-  return 'fas fa-circle'
+  return 'i-mdi-circle'
 }
 
 async function onRelease() {
@@ -355,14 +318,12 @@ async function onRelease() {
 </script>
 
 <style scoped>
-.btn-fn-off {
-  background-color: #495057;
-  border-color: #495057;
-  color: #fff;
+.speed-segment:hover:not(:disabled) {
+  filter: brightness(1.2);
 }
-.btn-fn-off:hover:not(:disabled) {
-  background-color: #6c757d;
-  border-color: #6c757d;
-  color: #fff;
+
+.speed-segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
 }
 </style>

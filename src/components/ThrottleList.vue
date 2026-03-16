@@ -2,14 +2,13 @@
   <div>
     <!-- All Locomotives -->
     <div v-if="sortedRoster.length > 0">
-      <p v-if="power === PowerState.ON" class="text-muted mb-1" style="font-size: 0.75rem;">
-        <i class="fas fa-hand-pointer"></i> Tap to acquire/release
+      <p v-if="power === PowerState.ON" class="text-neutral-400 mb-1 text-xs">
+        <UIcon name="i-heroicons-hand-raised" /> Tap to acquire/release
       </p>
-      <div class="row">
+      <div class="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-0">
         <div
           v-for="entry in sortedRoster"
           :key="'loco-' + entry.address"
-          class="col-12 col-lg-6 col-xxl-4"
         >
           <!-- Show ThrottleCard if acquired, otherwise RosterCard -->
           <ThrottleCard v-if="jmriState.throttles.has(entry.address)" :throttle="jmriState.throttles.get(entry.address)!" />
@@ -19,10 +18,12 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else class="alert alert-info">
-      <i class="fas fa-info-circle"></i>
-      No locomotives loaded. Make sure JMRI is running and has locomotives in the roster.
-    </div>
+    <UAlert
+      v-else
+      color="info"
+      icon="i-heroicons-information-circle"
+      title="No locomotives loaded. Make sure JMRI is running and has locomotives in the roster."
+    />
   </div>
 </template>
 

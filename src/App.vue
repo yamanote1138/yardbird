@@ -7,44 +7,40 @@
   />
 
   <!-- Main Application -->
-  <div v-else class="min-vh-100 bg-dark text-light">
+  <div v-else class="min-h-screen bg-neutral-950 text-white">
     <!-- Sticky Header Section -->
-    <div class="sticky-header bg-dark">
-      <div class="container-fluid py-2 py-sm-3 pb-2">
+    <div class="sticky top-0 z-[1000] bg-neutral-950 header-shadow">
+      <div class="px-4 py-2 sm:py-3 pb-2">
         <!-- Header -->
-        <h1 class="h5 h5-sm-4 mb-1">{{ railroadName }}</h1>
-        <p class="text-muted small mb-2 mb-sm-3">{{ connectionSubtitle }}</p>
+        <h1 class="text-lg font-semibold mb-1">{{ railroadName }}</h1>
+        <p class="text-neutral-400 text-sm mb-2 sm:mb-3">{{ connectionSubtitle }}</p>
 
         <!-- Power Control with integrated status -->
         <PowerControl @logout="handleLogout" />
       </div>
-      <hr class="divider m-0">
+      <hr class="border-white/10 m-0">
 
       <!-- Tab Navigation -->
-      <ul class="nav nav-pills nav-tab-bar px-3 py-2 gap-2">
-        <li class="nav-item">
-          <button
-            class="nav-link tab-pill small py-1 px-3"
-            :class="{ active: activeTab === 'locos' }"
-            @click="activeTab = 'locos'"
-          >
-            <i class="fas fa-train"></i> Locomotives
-          </button>
-        </li>
-        <li class="nav-item">
-          <button
-            class="nav-link tab-pill small py-1 px-3"
-            :class="{ active: activeTab === 'turnouts' }"
-            @click="activeTab = 'turnouts'"
-          >
-            <i class="fas fa-code-branch"></i> Turnouts
-          </button>
-        </li>
-      </ul>
+      <div class="flex gap-2 px-3 py-2 border-b border-white/10">
+        <button
+          class="tab-pill text-sm py-1 px-3 rounded-full transition-colors"
+          :class="activeTab === 'locos' ? 'bg-blue-600 text-white' : 'text-white/50 hover:text-white/80'"
+          @click="activeTab = 'locos'"
+        >
+          <UIcon name="i-mdi-train" /> Locomotives
+        </button>
+        <button
+          class="tab-pill text-sm py-1 px-3 rounded-full transition-colors"
+          :class="activeTab === 'turnouts' ? 'bg-blue-600 text-white' : 'text-white/50 hover:text-white/80'"
+          @click="activeTab = 'turnouts'"
+        >
+          <UIcon name="i-mdi-source-branch" /> Turnouts
+        </button>
+      </div>
     </div>
 
     <!-- Scrollable Content -->
-    <div class="container-fluid px-3 pt-2 pt-sm-3">
+    <div class="px-4 pt-2 sm:pt-3">
       <ThrottleList v-show="activeTab === 'locos'" />
       <TurnoutList v-show="activeTab === 'turnouts'" />
     </div>
@@ -154,8 +150,6 @@ const handleConnect = async (settings: ConnectionSettings) => {
       } else if ((newState === ConnectionState.DISCONNECTED || newState === ConnectionState.UNKNOWN) &&
                  !isInitialized.value &&
                  oldState !== undefined) {
-        // Connection failed during initial connection attempt
-        // Only trigger if we had a previous state (not the initial state)
         const protocol = settings.secure ? 'wss' : 'ws'
         const url = `${protocol}://${settings.host}:${settings.port}`
 
@@ -171,7 +165,6 @@ const handleConnect = async (settings: ConnectionSettings) => {
   } catch (error: any) {
     logger.error('Failed to initialize connection:', error)
 
-    // Provide detailed error message
     let errorMsg = 'Failed to connect: '
     if (error.message) {
       errorMsg += error.message
@@ -192,37 +185,7 @@ const handleLogout = () => {
 </script>
 
 <style scoped>
-.sticky-header {
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+.header-shadow {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.divider {
-  border: 0;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  opacity: 0.5;
-}
-
-.nav-tab-bar {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.tab-pill {
-  color: rgba(255, 255, 255, 0.5);
-  background: transparent;
-  border: 1px solid transparent;
-  transition: color 0.15s, background-color 0.15s;
-}
-
-.tab-pill:hover {
-  color: rgba(255, 255, 255, 0.8);
-}
-
-.tab-pill.active {
-  color: #fff;
-  background-color: #0d6efd;
-  border-color: #0d6efd;
 }
 </style>

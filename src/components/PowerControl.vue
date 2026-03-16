@@ -1,41 +1,46 @@
 <template>
-  <div class="btn-group w-100 mb-2 mb-sm-3" role="group">
+  <div class="flex w-full gap-1 mb-2 sm:mb-3" role="group">
     <!-- Combined Connection Status Indicator -->
-    <button
-      class="btn btn-sm status-indicator"
-      :class="statusClass"
+    <UButton
+      size="sm"
+      :color="statusColor"
       disabled
       :title="statusText"
     >
-      <i class="fas" :class="statusIcon"></i>
-    </button>
-    <button
-      class="btn"
-      :class="buttonClass"
+      <UIcon :name="statusIcon" />
+    </UButton>
+    <UButton
+      :color="buttonColor"
       @click="togglePower"
       :disabled="!isConnected || isBusy"
       :title="buttonText"
     >
-      <i class="fas" :class="buttonIcon"></i>
-      <span class="d-none d-sm-inline ms-1">{{ buttonText }}</span>
-    </button>
-    <button
-      class="btn btn-danger"
+      <template #leading>
+        <UIcon :name="buttonIcon" />
+      </template>
+      <span class="hidden sm:inline">{{ buttonText }}</span>
+    </UButton>
+    <UButton
+      color="error"
       @click="stopAll"
       :disabled="!isConnected || isStopping || throttles.length === 0"
       :title="isStopping ? 'Stopping...' : 'Emergency Stop All'"
     >
-      <i class="fas fa-hand"></i>
-      <span class="d-none d-sm-inline ms-1">{{ isStopping ? 'Stopping...' : 'Stop All' }}</span>
-    </button>
-    <button
-      class="btn btn-secondary"
+      <template #leading>
+        <UIcon name="i-mdi-hand-back-left" />
+      </template>
+      <span class="hidden sm:inline">{{ isStopping ? 'Stopping...' : 'Stop All' }}</span>
+    </UButton>
+    <UButton
+      color="neutral"
       @click="handleLogout"
-      :title="'Disconnect and Return to Setup'"
+      title="Disconnect and Return to Setup"
     >
-      <i class="fas fa-right-from-bracket"></i>
-      <span class="d-none d-sm-inline ms-1">Logout</span>
-    </button>
+      <template #leading>
+        <UIcon name="i-heroicons-arrow-right-on-rectangle" />
+      </template>
+      <span class="hidden sm:inline">Logout</span>
+    </UButton>
   </div>
 </template>
 
@@ -53,69 +58,46 @@ const isBusy = ref(false)
 const isStopping = ref(false)
 
 // Combined connection status
-const statusClass = computed(() => {
-  // If server is down, we can't know JMRI state
-  if (!isServerOnline.value) {
-    return 'btn-warning'
-  }
-
-  // Server is up, show JMRI connection state
+const statusColor = computed(() => {
+  if (!isServerOnline.value) return 'warning'
   switch (connectionState.value) {
     case ConnectionState.CONNECTED:
-      return 'btn-success'
+      return 'success'
     case ConnectionState.DISCONNECTED:
     case ConnectionState.UNKNOWN:
-      return 'btn-warning'
+      return 'warning'
   }
 })
 
 const statusText = computed(() => {
-  // If server is down, that's the primary issue
-  if (!isServerOnline.value) {
-    return 'Web Server Offline'
-  }
-
-  // Server is up, show JMRI connection state
-  let text = ''
+  if (!isServerOnline.value) return 'Web Server Offline'
   switch (connectionState.value) {
     case ConnectionState.CONNECTED:
-      text = 'Connected'
-      break
+      return 'Connected'
     case ConnectionState.DISCONNECTED:
-      text = 'Disconnected'
-      break
+      return 'Disconnected'
     case ConnectionState.UNKNOWN:
-      text = 'Connection Unknown'
-      break
+      return 'Connection Unknown'
   }
-  return text
 })
 
 const statusIcon = computed(() => {
-  // Server is down - show sad face
-  if (!isServerOnline.value) {
-    return 'fa-face-frown'
-  }
-
-  // Server is up - show JMRI connection state
+  if (!isServerOnline.value) return 'i-heroicons-face-frown'
   switch (connectionState.value) {
     case ConnectionState.CONNECTED:
-      return 'fa-plug-circle-bolt'
+      return 'i-mdi-power-plug'
     case ConnectionState.DISCONNECTED:
-      // Disconnected: show X
-      return 'fa-plug-circle-xmark'
+      return 'i-mdi-power-plug-off'
     case ConnectionState.UNKNOWN:
-      // Unknown JMRI state (reconnecting, etc)
-      return 'fa-circle-question'
     default:
-      return 'fa-circle-question'
+      return 'i-heroicons-question-mark-circle'
   }
 })
 
-const buttonClass = computed(() => {
-  if (power.value === PowerState.ON) return 'btn-primary'
-  if (power.value === PowerState.OFF) return 'btn-secondary'
-  return 'btn-warning'  // UNKNOWN state
+const buttonColor = computed(() => {
+  if (power.value === PowerState.ON) return 'primary'
+  if (power.value === PowerState.OFF) return 'neutral'
+  return 'warning'
 })
 
 const buttonText = computed(() => {
@@ -123,9 +105,9 @@ const buttonText = computed(() => {
 })
 
 const buttonIcon = computed(() => {
-  if (power.value === PowerState.ON) return 'fa-bolt'
-  if (power.value === PowerState.OFF) return 'fa-power-off'
-  return 'fa-circle-question'  // UNKNOWN state
+  if (power.value === PowerState.ON) return 'i-heroicons-bolt'
+  if (power.value === PowerState.OFF) return 'i-mdi-power'
+  return 'i-heroicons-question-mark-circle'
 })
 
 async function togglePower() {
@@ -136,7 +118,6 @@ async function togglePower() {
 
   isBusy.value = true
   try {
-    // Toggle: ON → OFF, OFF → ON, UNKNOWN → ON
     const newState = power.value === PowerState.ON ? 'off' : 'on'
     console.log('Setting power to:', newState)
     await setPower(newState)
@@ -164,27 +145,3 @@ function handleLogout() {
   emit('logout')
 }
 </script>
-
-<style scoped>
-/* Status indicator with bright, clear colors */
-.status-indicator.btn-success {
-  background-color: #28a745;
-  border-color: #28a745;
-  color: #ffffff;
-}
-
-
-.status-indicator.btn-warning {
-  background-color: #ffc107;
-  border-color: #ffc107;
-  color: #212529;
-}
-
-/* Smaller buttons on mobile for vertical space savings */
-@media (max-width: 575px) {
-  .btn-group .btn {
-    padding: 0.375rem 0.5rem;
-    font-size: 0.875rem;
-  }
-}
-</style>
