@@ -5,9 +5,9 @@
 
 import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
-import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction } from '@/types/jmri'
+import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
-import { JmriClient, PowerState } from 'jmri-client'
+import { JmriClient, PowerState, LightState } from 'jmri-client'
 
 // Connection state enum
 export enum ConnectionState {
@@ -29,7 +29,8 @@ const jmriState = ref<JmriState>({
   power: 0, // PowerState.UNKNOWN
   roster: new Map(),
   throttles: new Map(),
-  turnouts: new Map()
+  turnouts: new Map(),
+  lights: new Map()
 })
 
 const connectionState = ref<ConnectionState>(ConnectionState.DISCONNECTED)
@@ -103,6 +104,13 @@ export function useJmri() {
       } catch (error) {
         logger.error('Failed to fetch turnouts on connect:', error)
       }
+
+      // Fetch lights
+      try {
+        await fetchLights()
+      } catch (error) {
+        logger.error('Failed to fetch lights on connect:', error)
+      }
     })
 
     jmriClient.on('hello', (data: any) => {
@@ -171,6 +179,18 @@ export function useJmri() {
       } else {
         // Turnout not in our list - add with minimal data
         jmriState.value.turnouts.set(name, { name, state })
+      }
+    })
+
+    jmriClient.on('light:changed', (name: string, state: any) => {
+      logger.info(`Light ${name} changed to`, state === LightState.ON ? 'ON' : state === LightState.OFF ? 'OFF' : 'UNKNOWN')
+
+      // Update existing light or add new one
+      const existing = jmriState.value.lights.get(name)
+      if (existing) {
+        jmriState.value.lights.set(name, { ...existing, state })
+      } else {
+        jmriState.value.lights.set(name, { name, state })
       }
     })
 
@@ -499,6 +519,65 @@ export function useJmri() {
   }
 
   /**
+   * Fetch lights from JMRI
+   */
+  async function fetchLights() {
+    if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
+      logger.error('Cannot fetch lights: JMRI client not connected')
+      return
+    }
+
+    try {
+      logger.info('Fetching lights from JMRI')
+      const lights = await jmriClient.listLights()
+
+      for (const light of lights) {
+        const lightData: LightData = {
+          name: light.name,
+          userName: light.userName,
+          comment: light.comment ?? undefined,
+          state: light.state ?? LightState.UNKNOWN
+        }
+        jmriState.value.lights.set(light.name, lightData)
+      }
+
+      logger.info(`Loaded ${lights.length} lights from JMRI`)
+    } catch (error) {
+      logger.error('Failed to fetch lights:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Toggle light state (ON <-> OFF)
+   */
+  async function toggleLight(name: string) {
+    if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
+      logger.error('Cannot toggle light: JMRI client not connected')
+      return
+    }
+
+    const light = jmriState.value.lights.get(name)
+    if (!light) {
+      logger.error(`No light found with name ${name}`)
+      return
+    }
+
+    try {
+      if (light.state === LightState.ON) {
+        logger.info(`Turning off light ${name}`)
+        await jmriClient.turnOffLight(name)
+      } else {
+        logger.info(`Turning on light ${name}`)
+        await jmriClient.turnOnLight(name)
+      }
+    } catch (error) {
+      logger.error(`Failed to toggle light ${name}:`, error)
+      throw error
+    }
+  }
+
+  /**
    * Acquire a throttle for control
    */
   async function acquireThrottle(address: number) {
@@ -756,6 +835,7 @@ export function useJmri() {
     jmriState.value.throttles.clear()
     jmriState.value.roster.clear()
     jmriState.value.turnouts.clear()
+    jmriState.value.lights.clear()
     jmriState.value.power = 0
     railroadName.value = 'Model Railroad'
     jmriVersion.value = ''
@@ -775,6 +855,7 @@ export function useJmri() {
     roster: computed(() => Array.from(jmriState.value.roster.values())),
     throttles: computed(() => Array.from(jmriState.value.throttles.values())),
     turnouts: computed(() => Array.from(jmriState.value.turnouts.values())),
+    lights: computed(() => Array.from(jmriState.value.lights.values())),
     power: computed(() => jmriState.value.power),
 
     // Methods
@@ -786,6 +867,8 @@ export function useJmri() {
     setThrottleFunction,
     fetchRoster,
     fetchTurnouts,
+    fetchLights,
+    toggleLight,
     acquireThrottle,
     idleThrottle,
     releaseThrottle,

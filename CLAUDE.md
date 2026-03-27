@@ -9,12 +9,13 @@ This file contains project conventions, architecture decisions, and development 
 ### Tech Stack
 - **Vue 3** with Composition API and TypeScript
 - **Vite** for fast development and building
-- **Bootstrap 5** for responsive UI components
-- **jmri-client 3.5+** for WebSocket-based JMRI communication
+- **Nuxt UI 4** + **Tailwind CSS 4** for responsive UI components
+- **Iconify** (Material Design Icons + Heroicons) for icons
+- **jmri-client 4.1+** for WebSocket-based JMRI communication (power, throttles, turnouts, lights)
 - **Node.js 20+** required
 
 ### Current Version
-v3.5.0 - **Major Change**: Runtime configuration through web UI. Connection settings now configured on first launch instead of environment variables.
+v4.6.0 - Lights control via LCC, underline tab navigation, jmri-client 4.1.1
 
 ## User Context & Preferences
 
@@ -43,10 +44,15 @@ v3.5.0 - **Major Change**: Runtime configuration through web UI. Connection sett
    - State persists across component mounts/unmounts
 
 3. **Power State Management**
-   - Uses official PowerState enum from jmri-client (0=UNKNOWN, 1=ON, 2=OFF)
+   - Uses official PowerState enum from jmri-client (0=UNKNOWN, 2=ON, 4=OFF)
    - Three-state UI: ON (green), OFF (red), UNKNOWN (yellow)
    - Always fetch initial power state on connection
    - Verify power state after setting to handle JMRI quirks
+
+6. **Lights / LCC Independence**
+   - Lights use LCC (Layout Command Control), independent of DCC track power
+   - Light controls remain enabled even when track power is OFF
+   - Only requires active JMRI connection (unlike turnouts/throttles which also need power)
 
 4. **Heartbeat Interval**
    - Set to 15 seconds to prevent idle disconnects
@@ -66,11 +72,14 @@ v3.5.0 - **Major Change**: Runtime configuration through web UI. Connection sett
 /
 ├── src/
 │   ├── components/          # Vue components
+│   │   ├── ConnectionSetup.vue  # Initial connection configuration
+│   │   ├── LightList.vue        # Light toggle controls (LCC)
+│   │   ├── LocomotiveHeader.vue # Locomotive name/image header
+│   │   ├── PowerControl.vue     # Track power control + status
+│   │   ├── RosterCard.vue       # Locomotive roster display
 │   │   ├── ThrottleCard.vue     # Individual locomotive control
 │   │   ├── ThrottleList.vue     # List of active throttles
-│   │   ├── RosterCard.vue       # Locomotive roster display
-│   │   ├── PowerControl.vue     # Track power control
-│   │   └── StatusBar.vue        # Connection status
+│   │   └── TurnoutList.vue      # Turnout toggle controls
 │   ├── composables/         # Reusable composition functions
 │   │   ├── useJmri.ts          # Main JMRI client (singleton)
 │   │   └── useWebSocket.ts     # WebSocket utilities
@@ -257,7 +266,8 @@ v3.5.0 - **Major Change**: Runtime configuration through web UI. Connection sett
 
 3. **Responsive Design**
    - Mobile-first approach (as of v3.1.0)
-   - Bootstrap utility classes for responsive layouts
+   - Tailwind CSS utility classes for responsive layouts
+   - Nuxt UI components (UButton, UCard, UInput, UCheckbox, UAlert, UIcon)
    - Test on mobile, tablet, and desktop viewports
    - Dev server allows network access (`host: true`) for device testing
 
@@ -438,9 +448,10 @@ npm install package@version   # Install specific version
 ### Connection Lifecycle
 1. Application initializes JmriClient with config
 2. Manual connection triggered (autoConnect: false)
-3. On connect: fetch initial power state and roster
-4. Maintain 15-second heartbeat to prevent timeout
-5. Handle reconnection on disconnect (jmri-client handles this)
+3. On connect: fetch initial power state, turnouts, and lights
+4. User-initiated roster fetch after connection established
+5. Maintain 15-second heartbeat to prevent timeout
+6. Handle reconnection on disconnect (jmri-client handles this)
 
 ### Throttle Management
 - Throttles created on-demand when user selects locomotive
@@ -453,6 +464,12 @@ npm install package@version   # Install specific version
 - Parse `functionKeys` array from roster entries
 - Display only functions with labels (plus F0 as headlight)
 - Icon mapping for common functions (bell, horn, brake, etc.)
+
+### Light Control
+- Lights use LCC, independent of DCC track power
+- Fetched on connect via `listLights()`, real-time updates via `light:changed` event
+- Toggle between ON (LightState.ON=2) and OFF (LightState.OFF=4)
+- LightList component NOT disabled when track power is off (unlike turnouts/throttles)
 
 ### Power Control Quirks
 - JMRI power state can be inconsistent immediately after setting
@@ -481,8 +498,8 @@ npm install package@version   # Install specific version
 - Make sure tsconfig references are intact
 
 ### Mobile Display Issues
-- Test responsive breakpoints (576px, 768px, 992px, 1200px)
-- Use Bootstrap responsive utilities (d-sm, col-md, etc.)
+- Test responsive breakpoints (640px, 768px, 1024px, 1280px — Tailwind defaults)
+- Use Tailwind responsive utilities (sm:, md:, lg:, xl:)
 - Check for fixed-width elements breaking mobile layout
 - Test touch interactions on actual mobile devices
 
@@ -491,7 +508,6 @@ npm install package@version   # Install specific version
 These are NOT committed work, just ideas for consideration:
 
 - [ ] Automatic throttle release when idle
-- [ ] Turnout control panel (partially implemented)
 - [ ] Route/automation control
 - [ ] Consist (multiple unit) control
 - [ ] Saved layouts/presets
@@ -504,9 +520,10 @@ These are NOT committed work, just ideas for consideration:
 - **JMRI Documentation**: https://www.jmri.org/help/en/html/web/JsonServlet.shtml
 - **jmri-client Package**: https://www.npmjs.com/package/jmri-client
 - **Vue 3 Composition API**: https://vuejs.org/guide/extras/composition-api-faq.html
-- **Vite Environment Variables**: https://vitejs.dev/guide/env-and-mode.html
-- **Bootstrap 5 Docs**: https://getbootstrap.com/docs/5.3/
+- **Vite**: https://vitejs.dev/guide/
+- **Nuxt UI**: https://ui.nuxt.com/
+- **Tailwind CSS**: https://tailwindcss.com/docs
 
 ---
 
-*Last Updated: February 2026 (v3.4.0)*
+*Last Updated: March 2026 (v4.6.0)*

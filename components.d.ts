@@ -12,6 +12,7 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ConnectionSetup: typeof import('./src/components/ConnectionSetup.vue')['default']
+    LightList: typeof import('./src/components/LightList.vue')['default']
     LocomotiveHeader: typeof import('./src/components/LocomotiveHeader.vue')['default']
     PowerControl: typeof import('./src/components/PowerControl.vue')['default']
     RosterCard: typeof import('./src/components/RosterCard.vue')['default']

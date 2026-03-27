@@ -18,24 +18,47 @@
         <!-- Power Control with integrated status -->
         <PowerControl @logout="handleLogout" />
       </div>
-      <hr class="border-white/10 m-0">
 
       <!-- Tab Navigation -->
-      <div class="flex gap-2 px-3 py-2 border-b border-white/10">
-        <button
-          class="tab-pill text-sm py-1 px-3 rounded-full transition-colors"
-          :class="activeTab === 'locos' ? 'bg-blue-600 text-white' : 'text-white/50 hover:text-white/80'"
-          @click="activeTab = 'locos'"
-        >
-          <UIcon name="i-mdi-train" /> Locomotives
-        </button>
-        <button
-          class="tab-pill text-sm py-1 px-3 rounded-full transition-colors"
-          :class="activeTab === 'turnouts' ? 'bg-blue-600 text-white' : 'text-white/50 hover:text-white/80'"
-          @click="activeTab = 'turnouts'"
-        >
-          <UIcon name="i-mdi-source-branch" /> Turnouts
-        </button>
+      <div class="border-b border-white/10">
+        <ul class="flex flex-wrap -mb-px text-sm font-medium text-center">
+          <li class="me-2">
+            <button
+              class="inline-flex items-center justify-center p-4 border-b-2 rounded-t transition-colors group"
+              :class="activeTab === 'locos'
+                ? 'text-blue-400 border-blue-400'
+                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
+              @click="activeTab = 'locos'"
+            >
+              <UIcon name="i-mdi-train" class="w-4 h-4 me-2" />
+              Locomotives
+            </button>
+          </li>
+          <li class="me-2">
+            <button
+              class="inline-flex items-center justify-center p-4 border-b-2 rounded-t transition-colors group"
+              :class="activeTab === 'turnouts'
+                ? 'text-blue-400 border-blue-400'
+                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
+              @click="activeTab = 'turnouts'"
+            >
+              <UIcon name="i-mdi-source-branch" class="w-4 h-4 me-2" />
+              Turnouts
+            </button>
+          </li>
+          <li class="me-2">
+            <button
+              class="inline-flex items-center justify-center p-4 border-b-2 rounded-t transition-colors group"
+              :class="activeTab === 'lights'
+                ? 'text-blue-400 border-blue-400'
+                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
+              @click="activeTab = 'lights'"
+            >
+              <UIcon name="i-mdi-lightbulb-outline" class="w-4 h-4 me-2" />
+              Lights
+            </button>
+          </li>
+        </ul>
       </div>
     </div>
 
@@ -43,6 +66,7 @@
     <div class="px-4 pt-2 sm:pt-3">
       <ThrottleList v-show="activeTab === 'locos'" />
       <TurnoutList v-show="activeTab === 'turnouts'" />
+      <LightList v-show="activeTab === 'lights'" />
     </div>
   </div>
 </template>
@@ -56,12 +80,13 @@ import ConnectionSetup from '@/components/ConnectionSetup.vue'
 import PowerControl from '@/components/PowerControl.vue'
 import ThrottleList from '@/components/ThrottleList.vue'
 import TurnoutList from '@/components/TurnoutList.vue'
+import LightList from '@/components/LightList.vue'
 import type { ConnectionSettings } from '@/components/ConnectionSetup.vue'
 
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
 
 const isInitialized = ref(false)
-const activeTab = ref<'locos' | 'turnouts'>('locos')
+const activeTab = ref<'locos' | 'turnouts' | 'lights'>('locos')
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 const connectionHost = ref('')
 const connectionMock = ref(false)

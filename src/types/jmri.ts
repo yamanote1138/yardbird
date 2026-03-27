@@ -1,8 +1,8 @@
 import type { PowerState } from 'jmri-client'
-import { TurnoutState } from 'jmri-client'
+import { TurnoutState, LightState } from 'jmri-client'
 
 // Re-export for use in components
-export { TurnoutState }
+export { TurnoutState, LightState }
 
 export enum Direction {
   FORWARD = true,
@@ -41,9 +41,17 @@ export interface TurnoutData {
   comment?: string;       // User comment
 }
 
+export interface LightData {
+  name: string;           // System name: LL1, IL42, etc.
+  userName?: string;      // User-friendly name
+  comment?: string;       // User comment
+  state: LightState;      // Current state
+}
+
 export interface JmriState {
   power: PowerState;
   roster: Map<number, RosterEntry>;
   throttles: Map<number, Throttle>;
   turnouts: Map<string, TurnoutData>;
+  lights: Map<string, LightData>;
 }

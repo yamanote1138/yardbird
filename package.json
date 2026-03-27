@@ -1,6 +1,6 @@
 {
   "name": "io-thechad-trains",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "type": "module",
   "private": true,
   "engines": {
@@ -15,7 +15,7 @@
   "dependencies": {
     "@nuxt/ui": "^4.5.1",
     "events": "^3.3.0",
-    "jmri-client": "^3.7.1",
+    "jmri-client": "^4.1.1",
     "tailwindcss": "^4.2.1",
     "vue": "^3.5.13",
     "vue-router": "^4.6.4"

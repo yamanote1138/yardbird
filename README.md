@@ -6,8 +6,8 @@ Modern web-based control system for JMRI model railroad operations.
 
 - **Vue 3** - Composition API with TypeScript
 - **Vite** - Fast build tool
-- **Bootstrap 5** - Modern CSS framework
-- **jmri-client 3.5** - WebSocket-based JMRI communication
+- **Nuxt UI 4** + **Tailwind CSS 4** - UI components and styling
+- **jmri-client 4.1** - WebSocket-based JMRI communication
 
 ## Requirements
 
@@ -126,6 +126,7 @@ Or use GitHub Pages, Netlify, Vercel, etc.
 - **Power Control** - Track power on/off
 - **Throttle Control** - Speed, direction, and functions for locomotives
 - **Turnout Control** - Switch turnout positions
+- **Light Control** - Toggle LCC lights (works independently of track power)
 - **Real-time Updates** - WebSocket connection for instant feedback
 - **Responsive Design** - Works on desktop, tablet, and mobile
 
@@ -140,6 +141,7 @@ This is a pure frontend single-page application (SPA) that connects directly to 
 │  - Train controls   │
 │  - Power controls   │
 │  - Turnout controls │
+│  - Light controls   │
 │  - Throttle UI      │
 └──────────┬──────────┘
            │ WebSocket
