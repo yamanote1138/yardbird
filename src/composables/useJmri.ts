@@ -7,7 +7,8 @@ import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
 import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
-import { JmriClient, PowerState, LightState } from 'jmri-client'
+import { PowerState, LightState } from 'jmri-client'
+import { ExtendedJmriClient } from '@/composables/ExtendedJmriClient'
 
 // Connection state enum
 export enum ConnectionState {
@@ -24,6 +25,9 @@ export interface JmriConnectionSettings {
   mockDelay?: number
 }
 
+// Tram DCC addresses — these are filtered out of the main locomotive roster
+export const TRAM_ADDRESSES = [30, 31] as const
+
 // Singleton state
 const jmriState = ref<JmriState>({
   power: 0, // PowerState.UNKNOWN
@@ -37,7 +41,7 @@ const connectionState = ref<ConnectionState>(ConnectionState.DISCONNECTED)
 const isServerOnline = ref<boolean>(true) // Browser/web server connectivity
 const railroadName = ref<string>('Model Railroad')
 const jmriVersion = ref<string>('')
-let jmriClient: any = null
+let jmriClient: ExtendedJmriClient | null = null
 let currentSettings: JmriConnectionSettings | null = null
 const throttleIds = new Map<number, string>() // address -> throttleId mapping
 
@@ -59,8 +63,8 @@ export function useJmri() {
     logger.debug('Initializing JMRI client with URL:', wsUrl)
     logger.debug('Mock mode enabled:', settings.mockEnabled)
 
-    // Initialize jmri-client v3.0
-    jmriClient = new JmriClient({
+    // Initialize extended JMRI client with named power support
+    jmriClient = new ExtendedJmriClient({
       host: settings.host,
       port: settings.port,
       protocol: settings.protocol,
@@ -852,12 +856,17 @@ export function useJmri() {
     // Computed
     isConnected: computed(() => connectionState.value === ConnectionState.CONNECTED),
     isMockMode: computed(() => currentSettings?.mockEnabled ?? false),
-    roster: computed(() => Array.from(jmriState.value.roster.values())),
+    locoRoster: computed(() =>
+      Array.from(jmriState.value.roster.values())
+        .filter(e => !(TRAM_ADDRESSES as readonly number[]).includes(e.address))
+    ),
+    tramRoster: computed(() =>
+      TRAM_ADDRESSES.map(addr => jmriState.value.roster.get(addr)).filter(Boolean) as import('@/types/jmri').RosterEntry[]
+    ),
     throttles: computed(() => Array.from(jmriState.value.throttles.values())),
     turnouts: computed(() => Array.from(jmriState.value.turnouts.values())),
     lights: computed(() => Array.from(jmriState.value.lights.values())),
     power: computed(() => jmriState.value.power),
-
     // Methods
     initialize,
     disconnect,

@@ -8,14 +8,28 @@ services:
     restart: unless-stopped
     ports:
       - ${DEV_PORT:-5173}:5173
+      - ${DCCEX_WS_PORT:-2561}:2561
     environment:
       - NODE_ENV=development
+      - DCCEX_HOST=${DCCEX_HOST:-}
+      - DCCEX_PORT=${DCCEX_PORT:-2560}
+      - DCCEX_WS_PORT=${DCCEX_WS_PORT:-2561}
     volumes:
       - ./src:/usr/src/app/src
       - ./public:/usr/src/app/public
       - ./index.html:/usr/src/app/index.html
       - ./vite.config.ts:/usr/src/app/vite.config.ts
-    command: npm run dev -- --host 0.0.0.0
+      - ./proxy:/usr/src/app/proxy
+    command: >
+      sh -c "
+        if [ -n \"$$DCCEX_HOST\" ]; then
+          node proxy/dccex-ws-proxy.mjs
+            --ws-port $${DCCEX_WS_PORT:-2561}
+            --dccex-host $$DCCEX_HOST
+            --dccex-port $${DCCEX_PORT:-2560} &
+        fi;
+        npm run dev -- --host 0.0.0.0
+      "
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5173"]
       interval: 30s

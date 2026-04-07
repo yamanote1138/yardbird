@@ -34,11 +34,11 @@ import { PowerState } from 'jmri-client'
 import ThrottleCard from './ThrottleCard.vue'
 import RosterCard from './RosterCard.vue'
 
-const { roster, jmriState, power } = useJmri()
+const { locoRoster, jmriState, power } = useJmri()
 
 // Sort roster to show acquired throttles first (most recent at top)
 const sortedRoster = computed(() => {
-  return [...roster.value].sort((a, b) => {
+  return [...locoRoster.value].sort((a, b) => {
     const aAcquired = jmriState.value.throttles.has(a.address)
     const bAcquired = jmriState.value.throttles.has(b.address)
 

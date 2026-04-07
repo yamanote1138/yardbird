@@ -33,6 +33,40 @@
               </div>
             </div>
 
+            <!-- DCC-EX Tram Controller (Optional) -->
+            <div class="p-4 bg-white/5 rounded-md mb-4">
+              <div class="mb-2">
+                <UCheckbox
+                  id="dccex-enabled"
+                  v-model="settings.dccexEnabled"
+                  :disabled="settings.mockEnabled"
+                >
+                  <template #label>
+                    <span class="flex items-center gap-1">
+                      <UIcon name="i-mdi-tram" />
+                      DCC-EX Tram Controller
+                    </span>
+                  </template>
+                </UCheckbox>
+                <small class="text-neutral-400 text-xs block ml-6 mt-1">
+                  Connect to DCC-EX via WebSocket proxy for DC tram control
+                </small>
+              </div>
+              <div v-if="settings.dccexEnabled" class="mt-3">
+                <label for="dccex-server" class="block text-sm font-medium mb-1">DCC-EX Proxy Server</label>
+                <UInput
+                  id="dccex-server"
+                  v-model="dccexServerAddress"
+                  placeholder="raspi-jmri.local:2561"
+                  :disabled="settings.mockEnabled"
+                  size="lg"
+                />
+                <small class="text-neutral-400 text-xs mt-1 block">
+                  WebSocket proxy host and port (e.g., raspi-jmri.local:2561)
+                </small>
+              </div>
+            </div>
+
             <!-- Secure (WSS) -->
             <div class="mb-4">
               <UCheckbox
@@ -145,6 +179,9 @@ export interface ConnectionSettings {
   secure: boolean
   mockEnabled: boolean
   debugEnabled: boolean
+  dccexEnabled: boolean
+  dccexHost: string
+  dccexPort: number
 }
 
 const emit = defineEmits<{
@@ -156,7 +193,10 @@ const settings = ref<ConnectionSettings>({
   port: 12080,
   secure: false,
   mockEnabled: false,
-  debugEnabled: false
+  debugEnabled: false,
+  dccexEnabled: false,
+  dccexHost: 'raspi-jmri.local',
+  dccexPort: 2561
 })
 
 const isConnecting = ref(false)
@@ -175,6 +215,23 @@ const serverAddress = computed({
       const port = parseInt(parts[1].trim())
       if (!isNaN(port) && port > 0 && port <= 65535) {
         settings.value.port = port
+      }
+    }
+  }
+})
+
+// Combined DCC-EX server address (host:port)
+const dccexServerAddress = computed({
+  get: () => `${settings.value.dccexHost}:${settings.value.dccexPort}`,
+  set: (value: string) => {
+    const parts = value.split(':')
+    if (parts.length >= 1) {
+      settings.value.dccexHost = parts[0].trim()
+    }
+    if (parts.length >= 2) {
+      const port = parseInt(parts[1].trim())
+      if (!isNaN(port) && port > 0 && port <= 65535) {
+        settings.value.dccexPort = port
       }
     }
   }

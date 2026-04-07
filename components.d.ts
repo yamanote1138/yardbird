@@ -20,6 +20,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     ThrottleCard: typeof import('./src/components/ThrottleCard.vue')['default']
     ThrottleList: typeof import('./src/components/ThrottleList.vue')['default']
+    TramControl: typeof import('./src/components/TramControl.vue')['default']
     TurnoutList: typeof import('./src/components/TurnoutList.vue')['default']
     UAlert: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Alert.vue')['default']
     UButton: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']

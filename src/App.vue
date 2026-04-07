@@ -58,6 +58,18 @@
               Lights
             </button>
           </li>
+          <li class="me-2">
+            <button
+              class="inline-flex items-center justify-center p-4 border-b-2 rounded-t transition-colors group"
+              :class="activeTab === 'trams'
+                ? 'text-blue-400 border-blue-400'
+                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
+              @click="activeTab = 'trams'"
+            >
+              <UIcon name="i-mdi-tram" class="w-4 h-4 me-2" />
+              Trams
+            </button>
+          </li>
         </ul>
       </div>
     </div>
@@ -67,6 +79,7 @@
       <ThrottleList v-show="activeTab === 'locos'" />
       <TurnoutList v-show="activeTab === 'turnouts'" />
       <LightList v-show="activeTab === 'lights'" />
+      <TramControl v-show="activeTab === 'trams'" />
     </div>
   </div>
 </template>
@@ -74,6 +87,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/composables/useJmri'
+import { useDccEx } from '@/composables/useDccEx'
 import { version as appVersion } from '../package.json'
 import { logger } from '@/utils/logger'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
@@ -81,12 +95,14 @@ import PowerControl from '@/components/PowerControl.vue'
 import ThrottleList from '@/components/ThrottleList.vue'
 import TurnoutList from '@/components/TurnoutList.vue'
 import LightList from '@/components/LightList.vue'
+import TramControl from '@/components/TramControl.vue'
 import type { ConnectionSettings } from '@/components/ConnectionSetup.vue'
 
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
+const dccex = useDccEx()
 
 const isInitialized = ref(false)
-const activeTab = ref<'locos' | 'turnouts' | 'lights'>('locos')
+const activeTab = ref<'locos' | 'turnouts' | 'lights' | 'trams'>('locos')
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 const connectionHost = ref('')
 const connectionMock = ref(false)
@@ -170,6 +186,13 @@ const handleConnect = async (settings: ConnectionSettings) => {
           logger.error('Failed to fetch roster:', error)
         }
 
+        // Connect to DCC-EX if configured
+        if (settings.dccexEnabled) {
+          const dccexUrl = `ws://${settings.dccexHost}:${settings.dccexPort}`
+          logger.info('Connecting to DCC-EX proxy at', dccexUrl)
+          dccex.connect(dccexUrl)
+        }
+
         // Show main app
         isInitialized.value = true
       } else if ((newState === ConnectionState.DISCONNECTED || newState === ConnectionState.UNKNOWN) &&
@@ -203,6 +226,7 @@ const handleConnect = async (settings: ConnectionSettings) => {
 
 const handleLogout = () => {
   logger.info('Logging out')
+  dccex.disconnect()
   disconnect()
   isInitialized.value = false
   document.title = 'TOTI'
