@@ -38,17 +38,8 @@ COPY --from=builder /usr/src/app/dist /usr/share/caddy
 COPY proxy/dccex-ws-proxy.mjs /opt/dccex-proxy/dccex-ws-proxy.mjs
 RUN cd /opt/dccex-proxy && npm init -y > /dev/null 2>&1 && npm install ws
 
-# Create a simple Caddyfile for SPA routing
-RUN echo $'{\n\
-    auto_https off\n\
-}\n\
-\n\
-:80 {\n\
-    root * /usr/share/caddy\n\
-    encode gzip\n\
-    try_files {path} /index.html\n\
-    file_server\n\
-}' > /etc/caddy/Caddyfile
+# Caddyfile for SPA routing
+COPY Caddyfile /etc/caddy/Caddyfile
 
 # Entrypoint: start proxy in background, then Caddy in foreground
 COPY docker-entrypoint.sh /docker-entrypoint.sh
