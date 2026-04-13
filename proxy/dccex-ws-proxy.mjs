@@ -45,17 +45,30 @@ wss.on('connection', (ws, req) => {
 
   let wtReady = false
   let nativeReady = false
+  const wtQueue = []      // buffer WS messages arriving before TCP is ready
+  const nativeQueue = []
 
   tcpWT.on('connect', () => {
     console.log(`[${clientAddr}] WiThrottle TCP connected`)
     tcpWT.setNoDelay(true)
     wtReady = true
+    // Flush any messages that arrived before TCP was ready
+    for (const msg of wtQueue) {
+      console.log(`[${clientAddr}] WT  (queued) >>> ${msg.trimEnd()}`)
+      tcpWT.write(msg)
+    }
+    wtQueue.length = 0
   })
 
   tcpNative.on('connect', () => {
     console.log(`[${clientAddr}] Native TCP connected`)
     tcpNative.setNoDelay(true)
     nativeReady = true
+    for (const msg of nativeQueue) {
+      console.log(`[${clientAddr}] NAT (queued) >>> ${msg.trimEnd()}`)
+      tcpNative.write(msg)
+    }
+    nativeQueue.length = 0
   })
 
   // Forward WiThrottle responses to browser
@@ -78,9 +91,17 @@ wss.on('connection', (ws, req) => {
     console.log(`[${clientAddr}] WS  >>> ${str.trimEnd()}`)
 
     if (str.trimStart().startsWith('<')) {
-      if (nativeReady && !tcpNative.destroyed) tcpNative.write(str)
+      if (nativeReady && !tcpNative.destroyed) {
+        tcpNative.write(str)
+      } else {
+        nativeQueue.push(str)
+      }
     } else {
-      if (wtReady && !tcpWT.destroyed) tcpWT.write(str)
+      if (wtReady && !tcpWT.destroyed) {
+        tcpWT.write(str)
+      } else {
+        wtQueue.push(str)
+      }
     }
   })
 

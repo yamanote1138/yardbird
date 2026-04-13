@@ -30,9 +30,13 @@ let ws: WebSocket | null = null
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null
 let heartbeatInterval = 10 // seconds, updated by server
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+let handshakeTimer: ReturnType<typeof setTimeout> | null = null
 let wsUrl: string | null = null
 
-const isConnected = ref(false)
+const HANDSHAKE_TIMEOUT = 5000
+
+type DccExConnectionState = 'disconnected' | 'connecting' | 'connected'
+const connectionState = ref<DccExConnectionState>('disconnected')
 const powerState = ref<'on' | 'off' | 'unknown'>('unknown')
 const throttles = ref(new Map<number, DccExThrottle>())
 const roster = ref<DccExRosterEntry[]>([])
@@ -130,16 +134,23 @@ function handleMessage(raw: string): void {
       continue
     }
 
-    // DCC-EX ready signal — only mark connected after this
-    if (line.startsWith('HMConnected')) {
-      logger.info('[DCC-EX] Server ready')
-      isConnected.value = true
+    // DCC-EX hello message — marks server ready (e.g. "HMConnecting..")
+    if (line.startsWith('HM')) {
+      logger.info('[DCC-EX] Server ready:', line)
+      if (handshakeTimer) {
+        clearTimeout(handshakeTimer)
+        handshakeTimer = null
+      }
+      connectionState.value = 'connected'
+      // Query actual power state — WiThrottle PPA in the greeting can be
+      // stale/wrong. Native <s> returns the true state for all tracks.
+      send('<s>')
       continue
     }
 
     // Server info (ignored but logged)
     if (line.startsWith('VN') || line.startsWith('HT') || line.startsWith('Ht') ||
-        line.startsWith('HM') || line.startsWith('PT') || line.startsWith('PR')) {
+        line.startsWith('PT') || line.startsWith('PR')) {
       continue
     }
   }
@@ -241,7 +252,7 @@ function scheduleReconnect(): void {
   if (reconnectTimer) return
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null
-    if (wsUrl && !isConnected.value) {
+    if (wsUrl && connectionState.value === 'disconnected') {
       logger.info('[DCC-EX] Attempting reconnect...')
       connectWs(wsUrl)
     }
@@ -250,14 +261,23 @@ function scheduleReconnect(): void {
 
 function connectWs(url: string): void {
   wsUrl = url
+  connectionState.value = 'connecting'
   ws = new WebSocket(url)
 
   ws.onopen = () => {
     logger.info('[DCC-EX] WebSocket connected, sending handshake...')
-    // Don't set isConnected yet — wait for HMConnected from DCC-EX
-    // But we need send() to work, which checks ws.readyState (not isConnected)
     send('NTrains-TOTI')
     send('HUtoti-' + Date.now().toString(36))
+
+    // Timeout if DCC-EX doesn't complete the handshake
+    if (handshakeTimer) clearTimeout(handshakeTimer)
+    handshakeTimer = setTimeout(() => {
+      handshakeTimer = null
+      if (connectionState.value === 'connecting') {
+        logger.warn('[DCC-EX] Handshake timeout — closing and retrying')
+        ws?.close()
+      }
+    }, HANDSHAKE_TIMEOUT)
   }
 
   ws.onmessage = (event) => {
@@ -266,7 +286,11 @@ function connectWs(url: string): void {
 
   ws.onclose = () => {
     logger.info('[DCC-EX] WebSocket disconnected')
-    isConnected.value = false
+    if (handshakeTimer) {
+      clearTimeout(handshakeTimer)
+      handshakeTimer = null
+    }
+    connectionState.value = 'disconnected'
     powerState.value = 'unknown'
     stopHeartbeat()
     scheduleReconnect()
@@ -289,6 +313,10 @@ export function useDccEx() {
       clearTimeout(reconnectTimer)
       reconnectTimer = null
     }
+    if (handshakeTimer) {
+      clearTimeout(handshakeTimer)
+      handshakeTimer = null
+    }
     wsUrl = null
     stopHeartbeat()
     if (ws) {
@@ -296,10 +324,29 @@ export function useDccEx() {
       ws.close()
       ws = null
     }
-    isConnected.value = false
+    connectionState.value = 'disconnected'
     powerState.value = 'unknown'
     throttles.value = new Map()
     roster.value = []
+  }
+
+  function retry(): void {
+    if (!wsUrl) return
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    if (handshakeTimer) {
+      clearTimeout(handshakeTimer)
+      handshakeTimer = null
+    }
+    if (ws) {
+      ws.onclose = null
+      ws.close()
+      ws = null
+    }
+    stopHeartbeat()
+    connectWs(wsUrl)
   }
 
   function setPower(on: boolean): void {
@@ -336,7 +383,8 @@ export function useDccEx() {
 
   return {
     // State
-    isConnected: computed(() => isConnected.value),
+    isConnected: computed(() => connectionState.value === 'connected'),
+    connectionState: computed(() => connectionState.value),
     powerState: computed(() => powerState.value),
     throttles: computed(() => throttles.value),
     roster: computed(() => roster.value),
@@ -344,6 +392,7 @@ export function useDccEx() {
     // Methods
     connect,
     disconnect,
+    retry,
     setPower,
     acquireThrottle,
     releaseThrottle,

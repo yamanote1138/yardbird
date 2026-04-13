@@ -2,12 +2,26 @@
   <div>
     <!-- DCC-EX Connection Status -->
     <UAlert
-      v-if="!dccex.isConnected.value"
-      color="warning"
-      icon="i-heroicons-exclamation-triangle"
-      title="DCC-EX not connected. Check proxy server and connection settings."
+      v-if="dccex.connectionState.value === 'connecting'"
+      color="info"
+      icon="i-heroicons-arrow-path"
+      title="Connecting to DCC-EX..."
       class="mb-3"
     />
+    <div v-else-if="!dccex.isConnected.value" class="flex items-center gap-2 mb-3">
+      <UAlert
+        color="warning"
+        icon="i-heroicons-exclamation-triangle"
+        title="DCC-EX not connected"
+        class="flex-1"
+      />
+      <UButton size="sm" color="warning" variant="outline" @click="dccex.retry()">
+        <template #leading>
+          <UIcon name="i-heroicons-arrow-path" />
+        </template>
+        Retry
+      </UButton>
+    </div>
 
     <!-- DCC-EX Power Control -->
     <div class="flex items-center gap-2 mb-3">
@@ -100,7 +114,7 @@
               class="flex-1"
               color="warning"
               @click="handleBrake(config.address)"
-              :disabled="controlsDisabled || isRamping[config.address]"
+              :disabled="controlsDisabled"
             >
               <template #leading>
                 <UIcon name="i-mdi-gauge" />
@@ -126,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
 import { useJmri } from '@/composables/useJmri'
 import { useDccEx } from '@/composables/useDccEx'
 import type { DccExThrottle } from '@/composables/useDccEx'
@@ -145,6 +159,7 @@ const { jmriState } = useJmri()
 const dccex = useDccEx()
 
 const isPowerBusy = ref(false)
+watch(() => dccex.powerState.value, () => { isPowerBusy.value = false })
 const isRamping = reactive<Record<number, boolean>>({})
 const stopFlags = reactive<Record<number, boolean>>({})
 
@@ -182,8 +197,6 @@ function getDccexLabel(address: number): string | undefined {
 function togglePower() {
   isPowerBusy.value = true
   dccex.setPower(dccex.powerState.value !== 'on')
-  // Power state updates reactively from DCC-EX PPA messages
-  setTimeout(() => { isPowerBusy.value = false }, 500)
 }
 
 function getThrottle(address: number): DccExThrottle {
@@ -276,7 +289,6 @@ async function handleSetPowerLevel(address: number, clickedLevel: number, clicke
 
     for (let i = 1; i <= steps; i++) {
       if (stopFlags[address]) {
-        dccex.setSpeed(address, 0)
         break
       }
 
@@ -315,6 +327,12 @@ async function handleToggleDirection(address: number) {
 }
 
 async function handleBrake(address: number) {
+  // Interrupt any in-progress ramp, then ramp down to zero
+  stopFlags[address] = true
+  // Wait for current ramp to finish
+  while (isRamping[address]) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
   await handleSetPowerLevel(address, powerLevels[0], 0)
 }
 

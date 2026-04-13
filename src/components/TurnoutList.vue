@@ -9,7 +9,7 @@
           size="sm"
           :color="getTurnoutButtonColor(turnout)"
           :loading="changingTurnouts.has(turnout.name)"
-          :disabled="controlsDisabled"
+          :disabled="!isConnected"
           @click="handleToggle(turnout.name)"
         >
           <template #leading>
@@ -34,18 +34,12 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useJmri } from '@/composables/useJmri'
-import { PowerState } from 'jmri-client'
 import { TurnoutState } from '@/types/jmri'
 import type { TurnoutData } from '@/types/jmri'
 
-const { turnouts, isConnected, power, toggleTurnout } = useJmri()
+const { turnouts, isConnected, toggleTurnout } = useJmri()
 
 const changingTurnouts = ref<Set<string>>(new Set())
-
-// Disable controls when not connected or power is off
-const controlsDisabled = computed(() => {
-  return !isConnected.value || power.value !== PowerState.ON
-})
 
 // Sort turnouts by name (system name or user name)
 const sortedTurnouts = computed(() => {
