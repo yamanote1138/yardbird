@@ -15,7 +15,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 20+** required
 
 ### Current Version
-v4.7.1 - DCC-EX connection resilience and turnout LCC independence
+v4.8.0 - DC PWM frequency selector for tram control
 
 ## User Context & Preferences
 
@@ -38,6 +38,7 @@ v4.7.1 - DCC-EX connection resilience and turnout LCC independence
 - **Proxy message queuing** - Browser WS connects faster than proxy TCP to DCC-EX; proxy buffers early messages and flushes when TCP is ready
 - **useDccEx composable** - Singleton state pattern matching useJmri. Three-state connection (`disconnected`/`connecting`/`connected`). Power state from both WiThrottle `PPA` and native `<p>` responses. Queries native `<s>` on connect for true power state (WiThrottle greeting `PPA` can be stale).
 - **Tram addresses** - 30 (Track A / Inner Loop), 31 (Track B / Outer Loop) — filtered from main locomotive roster
+- **PWM frequency control (v4.8.0+)** - Per-track DC PWM frequency selector via native `<F cab DCFREQ n>` command. Four options: 131Hz (0), 490Hz (1), 3.4kHz (2), Supersonic (3). Defaults to 490Hz. Sent via native protocol through proxy. Requires DCC-EX `configurable-pwm` branch firmware.
 
 ### Key Architecture Decisions
 
@@ -553,4 +554,4 @@ These are NOT committed work, just ideas for consideration:
 
 ---
 
-*Last Updated: April 2026 (v4.7.1)*
+*Last Updated: April 2026 (v4.8.0)*

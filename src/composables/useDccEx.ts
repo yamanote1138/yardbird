@@ -381,6 +381,12 @@ export function useDccEx() {
     send(`MTA${key}<;>X`)
   }
 
+  function setPwmFrequency(address: number, freqIndex: number): void {
+    const clamped = Math.max(0, Math.min(3, Math.floor(freqIndex)))
+    send(`<F ${address} DCFREQ ${clamped}>`)
+    logger.info(`[DCC-EX] Set PWM frequency for address ${address} to index ${clamped}`)
+  }
+
   return {
     // State
     isConnected: computed(() => connectionState.value === 'connected'),
@@ -399,5 +405,6 @@ export function useDccEx() {
     setSpeed,
     setDirection,
     eStop,
+    setPwmFrequency,
   }
 }
