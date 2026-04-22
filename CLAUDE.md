@@ -1,10 +1,10 @@
-# Trains on the Interwebs (TOTI) - Project Guide
+# YardBird - Project Guide
 
 This file contains project conventions, architecture decisions, and development standards for maintaining consistency across Claude sessions.
 
 ## Project Overview
 
-**Trains on the Interwebs (TOTI)** is a modern web-based control system for JMRI (Java Model Railroad Interface) operations. It's a single-page application (SPA) that provides real-time control of model railroad equipment through a responsive web interface.
+**YardBird** is a modern web-based control system for JMRI (Java Model Railroad Interface) operations. It's a single-page application (SPA) that provides real-time control of model railroad equipment through a responsive web interface.
 
 ### Tech Stack
 - **Vue 3** with Composition API and TypeScript
@@ -301,7 +301,7 @@ The project includes Docker support for both development and production environm
    - Multi-stage Dockerfile builds optimized production image
    - Builder stage: Compiles Vue/TypeScript app with Node 20 Alpine
    - Production stage: Node 20 Alpine with Caddy binary + DCC-EX proxy
-   - Image published to Docker Hub: `yamanote1138/trains-thechad-io`
+   - Image published to Docker Hub: `yamanote1138/yardbird`
    - Includes health check endpoint
    - DCC-EX proxy starts automatically when `DCCEX_HOST` env var is set
 
@@ -341,7 +341,7 @@ The project includes Docker support for both development and production environm
 3. **CI/CD Build Strategy**
    - GitHub Actions builds single universal image
    - No environment-specific builds needed
-   - Image published to Docker Hub: `yamanote1138/trains-thechad-io`
+   - Image published to Docker Hub: `yamanote1138/yardbird`
    - Same image used for all deployments
 
 4. **Development**
@@ -439,7 +439,7 @@ docker compose up --build
 **Production mode** (from Docker Hub):
 ```bash
 docker compose up
-# Pulls yamanote1138/trains-thechad-io:latest
+# Pulls yamanote1138/yardbird:latest
 # Access at http://localhost:8080
 ```
 

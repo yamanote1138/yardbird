@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center">
     <div class="text-center max-w-sm px-6">
       <UIcon name="i-mdi-train" class="w-16 h-16 md:w-20 md:h-20 text-blue-400 mx-auto mb-6" />
-      <h1 class="text-3xl md:text-4xl font-bold mb-2">Trains on the Interwebs</h1>
+      <h1 class="text-3xl md:text-4xl font-bold mb-2">YardBird</h1>
       <p class="text-neutral-400 md:text-lg mb-10">Your JMRI layout control panel</p>
 
       <UAlert

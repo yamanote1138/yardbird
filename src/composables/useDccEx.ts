@@ -267,7 +267,7 @@ function connectWs(url: string): void {
 
   ws.onopen = () => {
     logger.info('[DCC-EX] WebSocket connected, sending handshake...')
-    send('NTrains-TOTI')
+    send('NYardBird')
     send('HUtoti-' + Date.now().toString(36))
 
     // Timeout if DCC-EX doesn't complete the handshake

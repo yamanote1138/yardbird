@@ -127,7 +127,7 @@ const connectionSubtitle = computed(() => {
   const parts = [
     cfg.mock ? 'mock data' : `${cfg.jmriHost}:${cfg.jmriPort}`,
     jmriVersion.value ? `JMRI ${jmriVersion.value}` : '',
-    `TOTI v${appVersion}`
+    `YardBird v${appVersion}`
   ]
   return parts.filter(Boolean).join(' | ')
 })
@@ -237,7 +237,7 @@ const handleExit = () => {
   disconnect()
   isInitialized.value = false
   haEnabled.value = false
-  document.title = 'TOTI'
+  document.title = 'YardBird'
 }
 </script>
 

@@ -1,4 +1,4 @@
-# Trains on the Interwebs (TOTI)
+# YardBird
 
 Modern web-based control system for JMRI model railroad operations.
 

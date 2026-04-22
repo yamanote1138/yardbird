@@ -1,10 +1,10 @@
 services:
-  trains-thechad-io-dev:
+  yardbird-dev:
     build:
       context: .
       dockerfile: Dockerfile
       target: builder
-    container_name: trains-thechad-io-dev
+    container_name: yardbird-dev
     restart: unless-stopped
     ports:
       - ${DEV_PORT:-5173}:5173
@@ -14,19 +14,19 @@ services:
       - DCCEX_HOST=${DCCEX_HOST:-}
       - DCCEX_PORT=${DCCEX_PORT:-2560}
       - DCCEX_WS_PORT=${DCCEX_WS_PORT:-2561}
-      - VITE_TOTI_JMRI_HOST=${TOTI_JMRI_HOST:-}
-      - VITE_TOTI_JMRI_PORT=${TOTI_JMRI_PORT:-}
-      - VITE_TOTI_JMRI_SECURE=${TOTI_JMRI_SECURE:-}
-      - VITE_TOTI_MOCK=${TOTI_MOCK:-}
-      - VITE_TOTI_DEBUG=${TOTI_DEBUG:-}
-      - VITE_TOTI_DCCEX_ENABLED=${TOTI_DCCEX_ENABLED:-}
-      - VITE_TOTI_DCCEX_HOST=${TOTI_DCCEX_HOST:-}
-      - VITE_TOTI_DCCEX_PORT=${TOTI_DCCEX_PORT:-}
-      - VITE_TOTI_DCCEX_PWM_FREQ=${TOTI_DCCEX_PWM_FREQ:-}
-      - VITE_TOTI_HA_ENABLED=${TOTI_HA_ENABLED:-}
-      - VITE_TOTI_HA_URL=${TOTI_HA_URL:-}
-      - VITE_TOTI_HA_TOKEN=${TOTI_HA_TOKEN:-}
-      - VITE_TOTI_HA_AREA=${TOTI_HA_AREA:-}
+      - VITE_YB_JMRI_HOST=${YB_JMRI_HOST:-}
+      - VITE_YB_JMRI_PORT=${YB_JMRI_PORT:-}
+      - VITE_YB_JMRI_SECURE=${YB_JMRI_SECURE:-}
+      - VITE_YB_MOCK=${YB_MOCK:-}
+      - VITE_YB_DEBUG=${YB_DEBUG:-}
+      - VITE_YB_DCCEX_ENABLED=${YB_DCCEX_ENABLED:-}
+      - VITE_YB_DCCEX_HOST=${YB_DCCEX_HOST:-}
+      - VITE_YB_DCCEX_PORT=${YB_DCCEX_PORT:-}
+      - VITE_YB_DCCEX_PWM_FREQ=${YB_DCCEX_PWM_FREQ:-}
+      - VITE_YB_HA_ENABLED=${YB_HA_ENABLED:-}
+      - VITE_YB_HA_URL=${YB_HA_URL:-}
+      - VITE_YB_HA_TOKEN=${YB_HA_TOKEN:-}
+      - VITE_YB_HA_AREA=${YB_HA_AREA:-}
     volumes:
       - ./src:/usr/src/app/src
       - ./public:/usr/src/app/public

@@ -1,6 +1,6 @@
 {
-  "name": "io-thechad-trains",
-  "version": "5.0.2",
+  "name": "yardbird",
+  "version": "6.0.0",
   "type": "module",
   "private": true,
   "engines": {
