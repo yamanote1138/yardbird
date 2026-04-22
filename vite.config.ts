@@ -30,8 +30,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: true,
-    rollupOptions: {
+rollupOptions: {
       output: {
         manualChunks: {
           'vue': ['vue']

@@ -1,6 +1,6 @@
 {
   "name": "io-thechad-trains",
-  "version": "5.0.0",
+  "version": "5.0.1",
   "type": "module",
   "private": true,
   "engines": {
@@ -14,7 +14,7 @@
     "type-check": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/ui": "^4.5.1",
+    "@nuxt/ui": "^4.6.1",
     "events": "^3.3.0",
     "jmri-client": "^4.1.1",
     "tailwindcss": "^4.2.1",
@@ -27,7 +27,7 @@
     "@vue/tsconfig": "^0.5.1",
     "playwright": "^1.58.2",
     "typescript": "^5.7.2",
-    "vite": "^6.0.6",
+    "vite": "^6.4.2",
     "vue-tsc": "^2.1.10"
   }
 }
