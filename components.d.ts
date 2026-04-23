@@ -12,9 +12,17 @@ export {}
 declare module 'vue' {
   export interface GlobalComponents {
     ConnectionSetup: typeof import('./src/components/ConnectionSetup.vue')['default']
+    LightList: typeof import('./src/components/LightList.vue')['default']
+    LocomotiveHeader: typeof import('./src/components/LocomotiveHeader.vue')['default']
     PowerControl: typeof import('./src/components/PowerControl.vue')['default']
+    RoomControl: typeof import('./src/components/RoomControl.vue')['default']
+    RosterCard: typeof import('./src/components/RosterCard.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ThrottleCard: typeof import('./src/components/ThrottleCard.vue')['default']
+    ThrottleList: typeof import('./src/components/ThrottleList.vue')['default']
+    TramControl: typeof import('./src/components/TramControl.vue')['default']
+    TurnoutList: typeof import('./src/components/TurnoutList.vue')['default']
     UAlert: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Alert.vue')['default']
     UButton: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Button.vue')['default']
     UCard: typeof import('./node_modules/@nuxt/ui/dist/runtime/components/Card.vue')['default']
