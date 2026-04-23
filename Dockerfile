@@ -3,7 +3,7 @@
 # ============================================
 # Builder Stage
 # ============================================
-FROM node:20.18.0-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /usr/src/app
 
@@ -26,7 +26,7 @@ RUN npm run build
 # ============================================
 # Production Stage - Caddy + DCC-EX Proxy
 # ============================================
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Install Caddy
 COPY --from=caddy:2-alpine /usr/bin/caddy /usr/bin/caddy
