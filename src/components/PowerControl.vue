@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useJmri, ConnectionState } from '@/composables/useJmri'
+import { useJmri, ConnectionState } from '@/plugins/jmri'
 import { PowerState, powerStateToString } from 'jmri-client'
 
 const emit = defineEmits<{

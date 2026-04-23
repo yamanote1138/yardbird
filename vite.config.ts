@@ -1,22 +1,10 @@
 import { fileURLToPath, URL } from 'node:url'
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import ui from '@nuxt/ui/vite'
 
-function devConfigStub(): Plugin {
-  return {
-    name: 'dev-config-stub',
-    configureServer(server) {
-      server.middlewares.use('/config.js', (_req, res) => {
-        res.setHeader('Content-Type', 'application/javascript')
-        res.end('')
-      })
-    }
-  }
-}
-
 export default defineConfig({
-  plugins: [vue(), ui(), devConfigStub()],
+  plugins: [vue(), ui()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
@@ -30,7 +18,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-rollupOptions: {
+    rollupOptions: {
       output: {
         manualChunks: {
           'vue': ['vue']

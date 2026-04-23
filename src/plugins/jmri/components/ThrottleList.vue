@@ -29,7 +29,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useJmri } from '@/composables/useJmri'
+import { useJmri } from '@/plugins/jmri'
 import { PowerState } from 'jmri-client'
 import ThrottleCard from './ThrottleCard.vue'
 import RosterCard from './RosterCard.vue'

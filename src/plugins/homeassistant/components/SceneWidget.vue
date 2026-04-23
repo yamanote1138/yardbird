@@ -107,7 +107,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useHomeAssistant } from '@/composables/useHomeAssistant'
+import { useHomeAssistant } from '@/plugins/homeassistant'
 import { logger } from '@/utils/logger'
 
 const ha = useHomeAssistant()

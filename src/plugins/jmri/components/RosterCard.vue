@@ -20,7 +20,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useJmri } from '@/composables/useJmri'
+import { useJmri } from '@/plugins/jmri'
 import { PowerState } from 'jmri-client'
 import type { RosterEntry } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'

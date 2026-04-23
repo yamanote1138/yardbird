@@ -1,7 +1,15 @@
 <template>
+  <!-- Config loading -->
+  <div v-if="configLoading" class="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+    <div class="text-center">
+      <img src="/favicon.svg" class="w-16 h-16 mx-auto mb-4 opacity-60" alt="YardBird" />
+      <p class="text-neutral-400 text-sm">Loading config...</p>
+    </div>
+  </div>
+
   <!-- Connection Setup Screen -->
   <ConnectionSetup
-    v-if="!isInitialized"
+    v-else-if="!isInitialized"
     ref="setupRef"
     @connect="handleConnect"
   />
@@ -22,64 +30,16 @@
       <!-- Tab Navigation -->
       <div class="border-b border-white/10">
         <ul class="flex flex-wrap -mb-px text-sm md:text-base font-medium text-center">
-          <li class="me-2">
+          <li v-for="tab in tabs" :key="tab.id" class="me-2">
             <button
               class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === 'locos'
+              :class="activeTab === tab.id
                 ? 'text-blue-400 border-blue-400'
                 : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = 'locos'"
+              @click="activeTab = tab.id"
             >
-              <UIcon name="i-mdi-train" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              Locomotives
-            </button>
-          </li>
-          <li class="me-2">
-            <button
-              class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === 'turnouts'
-                ? 'text-blue-400 border-blue-400'
-                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = 'turnouts'"
-            >
-              <UIcon name="i-mdi-source-branch" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              Turnouts
-            </button>
-          </li>
-          <li class="me-2">
-            <button
-              class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === 'lights'
-                ? 'text-blue-400 border-blue-400'
-                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = 'lights'"
-            >
-              <UIcon name="i-mdi-lightbulb-outline" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              Lights
-            </button>
-          </li>
-          <li class="me-2">
-            <button
-              class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === 'trams'
-                ? 'text-blue-400 border-blue-400'
-                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = 'trams'"
-            >
-              <UIcon name="i-mdi-tram" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              Trams
-            </button>
-          </li>
-          <li v-if="haEnabled" class="me-2">
-            <button
-              class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === 'room'
-                ? 'text-blue-400 border-blue-400'
-                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = 'room'"
-            >
-              <UIcon name="i-mdi-home-assistant" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              Room
+              <UIcon :name="tab.icon" class="w-4 h-4 md:w-5 md:h-5 me-2" />
+              {{ tab.name }}
             </button>
           </li>
         </ul>
@@ -88,44 +48,68 @@
 
     <!-- Scrollable Content -->
     <div class="px-4 md:px-6 pt-2 sm:pt-3 md:pt-4">
-      <ThrottleList v-show="activeTab === 'locos'" />
-      <TurnoutList v-show="activeTab === 'turnouts'" />
-      <LightList v-show="activeTab === 'lights'" />
-      <TramControl v-show="activeTab === 'trams'" />
-      <RoomControl v-show="activeTab === 'room'" />
+      <template v-for="tab in tabs" :key="tab.id">
+        <component
+          :is="tabComponents[tab.id]"
+          v-if="tabComponents[tab.id]"
+          v-show="activeTab === tab.id"
+        />
+      </template>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/composables/useJmri'
-import { useDccEx } from '@/composables/useDccEx'
-import { useHomeAssistant } from '@/composables/useHomeAssistant'
-import { getConfig } from '@/utils/config'
-import { version as appVersion } from '../package.json'
+import { ref, computed, watch, type Component } from 'vue'
+import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
+import { useDccEx } from '@/plugins/dccex'
+import { useHomeAssistant } from '@/plugins/homeassistant'
+import { useLayout } from '@/core/useLayout'
+import { setDebugMode } from '@/utils/logger'
 import { logger } from '@/utils/logger'
+import { version as appVersion } from '../package.json'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
 import PowerControl from '@/components/PowerControl.vue'
-import ThrottleList from '@/components/ThrottleList.vue'
-import TurnoutList from '@/components/TurnoutList.vue'
-import LightList from '@/components/LightList.vue'
-import TramControl from '@/components/TramControl.vue'
-import RoomControl from '@/components/RoomControl.vue'
+import ThrottleList from '@/plugins/jmri/components/ThrottleList.vue'
+import TurnoutList from '@/plugins/jmri/components/TurnoutList.vue'
+import LightList from '@/plugins/jmri/components/LightList.vue'
+import TramWidget from '@/plugins/dccex/components/TramWidget.vue'
+import SceneWidget from '@/plugins/homeassistant/components/SceneWidget.vue'
 
+const tabComponents: Record<string, Component> = {
+  throttles: ThrottleList,
+  turnouts:  TurnoutList,
+  lights:    LightList,
+  trams:     TramWidget,
+  room:      SceneWidget,
+}
+
+const layout = useLayout()
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
 const dccex = useDccEx()
 const ha = useHomeAssistant()
 
 const isInitialized = ref(false)
-const activeTab = ref<'locos' | 'turnouts' | 'lights' | 'trams' | 'room'>('locos')
-const haEnabled = ref(false)
+const activeTab = ref('')
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 
+const configLoading = computed(() => layout.loading.value)
+const tabs = computed(() => layout.tabs.value)
+
+// Set first tab as active once config loads
+watch(tabs, (newTabs) => {
+  if (newTabs.length && !activeTab.value) {
+    activeTab.value = newTabs[0].id
+  }
+}, { immediate: true })
+
+// Apply debug mode from config
+watch(layout.debug, (enabled) => setDebugMode(enabled), { immediate: true })
+
 const connectionSubtitle = computed(() => {
-  const cfg = getConfig()
+  const jmri = layout.plugins.value.jmri
   const parts = [
-    cfg.mock ? 'mock data' : `${cfg.jmriHost}:${cfg.jmriPort}`,
+    jmri?.mock ? 'mock data' : jmri ? `${jmri.host}:${jmri.port}` : '',
     jmriVersion.value ? `JMRI ${jmriVersion.value}` : '',
     `YardBird v${appVersion}`
   ]
@@ -137,17 +121,18 @@ watch(railroadName, (newName) => {
 }, { immediate: true })
 
 const handleConnect = async () => {
-  const cfg = getConfig()
+  const plugins = layout.plugins.value
+  const jmri = plugins.jmri
 
   try {
-    logger.info('Connecting with config:', cfg)
+    logger.info('Connecting with config:', plugins)
 
     const jmriSettings: JmriConnectionSettings = {
-      host: cfg.jmriHost,
-      port: cfg.jmriPort,
-      protocol: cfg.jmriSecure ? 'wss' : 'ws',
-      mockEnabled: cfg.mock,
-      mockDelay: 50
+      host: jmri.host,
+      port: jmri.port,
+      protocol: jmri.secure ? 'wss' : 'ws',
+      mockEnabled: jmri.mock ?? false,
+      mockDelay: 50,
     }
 
     let connectionTimeout: NodeJS.Timeout | null = null
@@ -156,10 +141,7 @@ const handleConnect = async () => {
     const handleConnectionError = (message: string) => {
       if (hasHandledError) return
       hasHandledError = true
-
-      if (connectionTimeout) {
-        clearTimeout(connectionTimeout)
-      }
+      if (connectionTimeout) clearTimeout(connectionTimeout)
       setupRef.value?.setError(message)
       disconnect()
     }
@@ -169,9 +151,9 @@ const handleConnect = async () => {
     connectionTimeout = setTimeout(() => {
       if (!isConnected.value && !isInitialized.value) {
         logger.error('Connection timeout after 10 seconds')
-        const protocol = cfg.jmriSecure ? 'wss' : 'ws'
+        const protocol = jmri.secure ? 'wss' : 'ws'
         handleConnectionError(
-          `Connection timeout. Unable to reach ${protocol}://${cfg.jmriHost}:${cfg.jmriPort}. ` +
+          `Connection timeout. Unable to reach ${protocol}://${jmri.host}:${jmri.port}. ` +
           `Check that the JMRI server is running and accessible.`
         )
       }
@@ -181,9 +163,7 @@ const handleConnect = async () => {
       logger.debug(`Connection state changed: ${oldState} -> ${newState}`)
 
       if (newState === ConnectionState.CONNECTED) {
-        if (connectionTimeout) {
-          clearTimeout(connectionTimeout)
-        }
+        if (connectionTimeout) clearTimeout(connectionTimeout)
         stopWatching()
 
         logger.info('Successfully connected to JMRI')
@@ -194,27 +174,29 @@ const handleConnect = async () => {
           logger.error('Failed to fetch roster:', error)
         }
 
-        if (cfg.dccexEnabled) {
-          const dccexUrl = `ws://${cfg.dccexHost}:${cfg.dccexPort}`
+        const dccexCfg = plugins.dccex
+        if (dccexCfg?.enabled) {
+          const dccexUrl = `ws://${dccexCfg.host}:${dccexCfg.port}`
           logger.info('Connecting to DCC-EX proxy at', dccexUrl)
-          dccex.setDefaultPwmFrequency(cfg.dccexPwmFreq)
+          dccex.setDefaultPwmFrequency(dccexCfg.pwmFreq ?? 3)
           dccex.connect(dccexUrl)
         }
 
-        if (cfg.haEnabled && cfg.haUrl && cfg.haToken && cfg.haArea) {
-          const haWsUrl = cfg.haUrl.replace(/^http/, 'ws').replace(/\/?$/, '/api/websocket')
+        const haCfg = plugins.homeassistant
+        if (haCfg?.enabled && haCfg.url && haCfg.token && haCfg.area) {
+          const haWsUrl = haCfg.url.replace(/^http/, 'ws').replace(/\/?$/, '/api/websocket')
           logger.info('Connecting to Home Assistant at', haWsUrl)
-          ha.connect(haWsUrl, cfg.haToken, cfg.haArea)
+          ha.connect(haWsUrl, haCfg.token, haCfg.area)
         }
-        haEnabled.value = cfg.haEnabled && !!cfg.haUrl
 
         isInitialized.value = true
-      } else if ((newState === ConnectionState.DISCONNECTED || newState === ConnectionState.UNKNOWN) &&
-                 !isInitialized.value &&
-                 oldState !== undefined) {
-        const protocol = cfg.jmriSecure ? 'wss' : 'ws'
-        const url = `${protocol}://${cfg.jmriHost}:${cfg.jmriPort}`
-
+      } else if (
+        (newState === ConnectionState.DISCONNECTED || newState === ConnectionState.UNKNOWN) &&
+        !isInitialized.value &&
+        oldState !== undefined
+      ) {
+        const protocol = jmri.secure ? 'wss' : 'ws'
+        const url = `${protocol}://${jmri.host}:${jmri.port}`
         logger.error('Connection failed to:', url)
         stopWatching()
         handleConnectionError(
@@ -236,7 +218,6 @@ const handleExit = () => {
   dccex.disconnect()
   disconnect()
   isInitialized.value = false
-  haEnabled.value = false
   document.title = 'YardBird'
 }
 </script>

@@ -1,2 +1,16 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+:root {
+  --ui-color-success-50: #f4fae5;
+  --ui-color-success-100: #e7f4c9;
+  --ui-color-success-200: #cde98d;
+  --ui-color-success-300: #b3dc56;
+  --ui-color-success-400: #a1c54b;
+  --ui-color-success-500: #98c130;
+  --ui-color-success-600: #7a9a26;
+  --ui-color-success-700: #5c741c;
+  --ui-color-success-800: #3d4e12;
+  --ui-color-success-900: #1f2809;
+  --ui-color-success-950: #111505;
+}

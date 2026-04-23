@@ -33,7 +33,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useJmri } from '@/composables/useJmri'
+import { useJmri } from '@/plugins/jmri'
 import { LightState } from '@/types/jmri'
 import type { LightData } from '@/types/jmri'
 

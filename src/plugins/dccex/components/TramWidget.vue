@@ -46,19 +46,31 @@
         :ui="{ body: 'py-2 sm:py-3' }"
       >
         <!-- Track Header -->
-        <div class="mb-2 sm:mb-3">
-          <LocomotiveHeader
-            v-if="jmriState.roster.has(config.address)"
-            :name="jmriState.roster.get(config.address)!.name"
-            :road="jmriState.roster.get(config.address)!.road"
-            :number="jmriState.roster.get(config.address)!.number"
-            :thumbnail-url="jmriState.roster.get(config.address)!.thumbnailUrl"
-            :disabled="true"
-          />
-          <div v-else>
-            <h3 class="text-base font-semibold">{{ getDccexLabel(config.address) || config.label }}</h3>
-            <p class="text-sm text-neutral-400">{{ config.sublabel }}</p>
+        <div class="mb-2 sm:mb-3 flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <LocomotiveHeader
+              v-if="jmriState.roster.has(config.address)"
+              :name="jmriState.roster.get(config.address)!.name"
+              :road="jmriState.roster.get(config.address)!.road"
+              :number="jmriState.roster.get(config.address)!.number"
+              :thumbnail-url="jmriState.roster.get(config.address)!.thumbnailUrl"
+              :disabled="true"
+            />
+            <div v-else>
+              <h3 class="text-base font-semibold">{{ getDccexLabel(config.address) || config.label }}</h3>
+              <p class="text-sm text-neutral-400">{{ config.sublabel }} ({{ pwmFreqLabel(config.address) }})</p>
+            </div>
           </div>
+          <UButton
+            v-if="dccex.throttles.value.has(config.address)"
+            size="xs"
+            color="neutral"
+            variant="ghost"
+            @click="handleRelease(config.address)"
+            class="shrink-0 mt-0.5"
+          >
+            Release
+          </UButton>
         </div>
 
         <!-- Acquire button (when not yet acquired) -->
@@ -142,11 +154,11 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { useJmri } from '@/composables/useJmri'
-import { useDccEx } from '@/composables/useDccEx'
-import type { DccExThrottle } from '@/composables/useDccEx'
+import { useJmri } from '@/plugins/jmri'
+import { useDccEx } from '@/plugins/dccex'
+import type { DccExThrottle } from '@/plugins/dccex'
 import { logger } from '@/utils/logger'
-import LocomotiveHeader from './LocomotiveHeader.vue'
+import LocomotiveHeader from '@/plugins/jmri/components/LocomotiveHeader.vue'
 
 const TRAM_CONFIGS = [
   { address: 30, label: 'Track 1', sublabel: 'Inner Loop' },
@@ -160,9 +172,26 @@ const { jmriState } = useJmri()
 const dccex = useDccEx()
 
 const isPowerBusy = ref(false)
-watch(() => dccex.powerState.value, () => { isPowerBusy.value = false })
+watch(() => dccex.powerState.value, (newState, oldState) => {
+  isPowerBusy.value = false
+  if (newState === 'off' && oldState === 'on') {
+    for (const config of TRAM_CONFIGS) {
+      if (dccex.throttles.value.has(config.address)) {
+        handleRelease(config.address)
+      }
+    }
+  }
+})
 const isRamping = reactive<Record<number, boolean>>({})
 const stopFlags = reactive<Record<number, boolean>>({})
+const pwmFreqByAddress = reactive<Record<number, number>>({})
+
+const PWM_FREQ_LABELS = ['131 Hz', '490 Hz', '3.4 kHz', 'Supersonic']
+
+function pwmFreqLabel(address: number): string {
+  const idx = pwmFreqByAddress[address] ?? dccex.getDefaultPwmFrequency()
+  return PWM_FREQ_LABELS[idx] ?? 'Unknown'
+}
 
 // WiThrottle speed levels: 0-126 mapped to 10 segments
 const powerLevels = [13, 25, 38, 50, 63, 76, 88, 101, 113, 126]
@@ -210,10 +239,18 @@ function getSpeedPercent(address: number): number {
 }
 
 function handleAcquire(address: number) {
+  const freq = dccex.getDefaultPwmFrequency()
+  pwmFreqByAddress[address] = freq
   dccex.acquireThrottle(address, false)
   setTimeout(() => {
-    dccex.setPwmFrequency(address, dccex.getDefaultPwmFrequency())
+    dccex.setPwmFrequency(address, freq)
   }, 500)
+}
+
+function handleRelease(address: number) {
+  stopFlags[address] = true
+  dccex.setSpeed(address, 0)
+  dccex.releaseThrottle(address, false)
 }
 
 /**
@@ -231,8 +268,8 @@ function getSpeedButtonClass(address: number, level: number, index: number): str
     reached = 'bg-amber-500'
     approaching = 'bg-amber-500/50'
   } else {
-    reached = 'bg-green-600'
-    approaching = 'bg-green-600/50'
+    reached = 'bg-success-600'
+    approaching = 'bg-success-600/50'
   }
 
   const previousLevel = index > 0 ? powerLevels[index - 1] : 0

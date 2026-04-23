@@ -31,9 +31,12 @@ FROM node:20-alpine
 # Install Caddy
 COPY --from=caddy:2-alpine /usr/bin/caddy /usr/bin/caddy
 
-# Copy built static files (world-writable so entrypoint can write config.js as non-root)
+# Copy built static files
 COPY --from=builder /usr/src/app/dist /usr/share/caddy
 RUN chmod 777 /usr/share/caddy
+
+# Config directory — volume mount /config/yardbird.yaml to override the built-in default
+RUN mkdir -p /config
 
 # Set up the DCC-EX WebSocket proxy with its dependency
 COPY proxy/dccex-ws-proxy.mjs /opt/dccex-proxy/dccex-ws-proxy.mjs

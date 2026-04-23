@@ -5,11 +5,10 @@
 
 import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
-import { getConfig } from '@/utils/config'
 import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
 import { PowerState, LightState } from 'jmri-client'
-import { ExtendedJmriClient } from '@/composables/ExtendedJmriClient'
+import { ExtendedJmriClient } from './ExtendedJmriClient'
 
 // Connection state enum
 export enum ConnectionState {
@@ -430,18 +429,18 @@ export function useJmri() {
 
         const address = parseInt(entryData.address)
 
-        const cfg = getConfig()
-        const httpProtocol = cfg.jmriSecure ? 'https' : 'http'
+        const httpProtocol = currentSettings?.protocol === 'wss' ? 'https' : 'http'
+        const { host, port, mockEnabled } = currentSettings ?? { host: '', port: 0, mockEnabled: false }
 
         let thumbnailUrl: string | undefined
 
-        if (cfg.mock) {
+        if (mockEnabled) {
           thumbnailUrl = `/locomotives/${entryData.name}.png`
         } else {
           thumbnailUrl = entryData.icon
-            ? `${httpProtocol}://${cfg.jmriHost}:${cfg.jmriPort}${entryData.icon}`
+            ? `${httpProtocol}://${host}:${port}${entryData.icon}`
             : entryData.name
-            ? `${httpProtocol}://${cfg.jmriHost}:${cfg.jmriPort}/roster/${encodeURI(entryData.name)}/icon?maxHeight=200`
+            ? `${httpProtocol}://${host}:${port}/roster/${encodeURI(entryData.name)}/icon?maxHeight=200`
             : undefined
         }
 
@@ -848,7 +847,7 @@ export function useJmri() {
 
     // Computed
     isConnected: computed(() => connectionState.value === ConnectionState.CONNECTED),
-    isMockMode: computed(() => getConfig().mock),
+    isMockMode: computed(() => currentSettings?.mockEnabled ?? false),
     locoRoster: computed(() =>
       Array.from(jmriState.value.roster.values())
         .filter(e => !(TRAM_ADDRESSES as readonly number[]).includes(e.address))

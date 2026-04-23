@@ -11,20 +11,8 @@ services:
       - DCCEX_HOST=${DCCEX_HOST:-}
       - DCCEX_PORT=${DCCEX_PORT:-2560}
       - DCCEX_WS_PORT=${DCCEX_WS_PORT:-2561}
-      # TOTI app configuration (injected into config.js at runtime)
-      - YB_JMRI_HOST=${YB_JMRI_HOST:-}
-      - YB_JMRI_PORT=${YB_JMRI_PORT:-}
-      - YB_JMRI_SECURE=${YB_JMRI_SECURE:-}
-      - YB_MOCK=${YB_MOCK:-}
-      - YB_DEBUG=${YB_DEBUG:-}
-      - YB_DCCEX_ENABLED=${YB_DCCEX_ENABLED:-}
-      - YB_DCCEX_HOST=${YB_DCCEX_HOST:-}
-      - YB_DCCEX_PORT=${YB_DCCEX_PORT:-}
-      - YB_DCCEX_PWM_FREQ=${YB_DCCEX_PWM_FREQ:-}
-      - YB_HA_ENABLED=${YB_HA_ENABLED:-}
-      - YB_HA_URL=${YB_HA_URL:-}
-      - YB_HA_TOKEN=${YB_HA_TOKEN:-}
-      - YB_HA_AREA=${YB_HA_AREA:-}
+    volumes:
+      - ./config:/config
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s

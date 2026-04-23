@@ -96,7 +96,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useJmri } from '@/composables/useJmri'
+import { useJmri } from '@/plugins/jmri'
 import { PowerState } from 'jmri-client'
 import type { Throttle } from '@/types/jmri'
 import { Direction } from '@/types/jmri'
@@ -139,8 +139,8 @@ function getSpeedButtonClass(level: number, index: number): string {
     reached = 'bg-amber-500'
     approaching = 'bg-amber-500/50'
   } else {
-    reached = 'bg-green-600'
-    approaching = 'bg-green-600/50'
+    reached = 'bg-success-600'
+    approaching = 'bg-success-600/50'
   }
 
   const previousLevel = index > 0 ? powerLevels[index - 1] : 0

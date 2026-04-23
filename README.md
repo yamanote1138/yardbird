@@ -1,190 +1,290 @@
-# YardBird
+<div align="center">
+  <img src="public/favicon.svg" width="96" alt="YardBird" />
+  <h1>YardBird</h1>
+  <p>A customizable, plugin-driven layout control panel for model railroads.</p>
+</div>
 
-Modern web-based control system for JMRI model railroad operations.
+---
+
+YardBird is a pure frontend SPA that connects directly to your layout hardware via WebSocket — no backend server required. Tabs, plugins, and connections are defined in a single YAML file you own and edit.
+
+## Features
+
+- **Locomotive throttles** — speed, direction, and function buttons from your JMRI roster
+- **Turnouts** — toggle switch positions (JMRI / LCC)
+- **Lights** — toggle LCC lights, independent of track power
+- **DC tram control** — direct DCC-EX connection for DC loop trams, with PWM frequency selector
+- **Home Assistant** — trigger HA scenes from a layout tab
+- **Config-driven tabs** — add, remove, rename, and reorder tabs in `yardbird.yaml`
+- **Responsive** — works on desktop, tablet, and mobile
 
 ## Tech Stack
 
-- **Vue 3** - Composition API with TypeScript
-- **Vite** - Fast build tool
-- **Nuxt UI 4** + **Tailwind CSS 4** - UI components and styling
-- **jmri-client 4.1** - WebSocket-based JMRI communication
+| | |
+|---|---|
+| [Vue 3](https://vuejs.org/) + TypeScript | Composition API throughout |
+| [Vite](https://vitejs.dev/) | Dev server and build tool |
+| [Nuxt UI 4](https://ui.nuxt.com/) + [Tailwind CSS 4](https://tailwindcss.com/) | UI components and styling |
+| [jmri-client 4.1](https://www.npmjs.com/package/jmri-client) | JMRI WebSocket communication |
+| [js-yaml](https://github.com/nodeca/js-yaml) | Config file parsing |
 
-## Requirements
+## Architecture
 
-- Node.js 20+ (for development only)
-- JMRI server running with JSON WebSocket enabled (or use Mock Mode)
-- Browser on same network as JMRI server
+YardBird is a pure frontend SPA. The browser connects directly to JMRI and (optionally) DCC-EX via WebSocket — no intermediate server. The DCC-EX proxy is the only server-side component, and it's optional.
 
-## Quick Start
+```
+┌───────────────────────────────┐
+│        Browser (Vue 3)        │
+│                               │
+│  core/useLayout  ←  yardbird.yaml
+│  core/useRegistry             │
+│                               │
+│  plugins/jmri ─────────────── │──→ ws://jmri:12080
+│  plugins/dccex ───────────────│──→ ws://proxy:2561
+│  plugins/homeassistant ───────│──→ ws://ha:8123
+└───────────────────────────────┘
+                                        │
+                    ┌───────────────────┘
+                    ▼
+         ┌─────────────────────┐
+         │  DCC-EX WS Proxy    │
+         │  :2561              │
+         │  ┌─ WiThrottle TCP ─│──→ DCC-EX :2560
+         │  └─ Native TCP ─────│──→ DCC-EX :2560
+         └─────────────────────┘
+```
 
-The application features a **connection setup screen** on first launch where you configure your JMRI connection. No configuration files needed!
+### Plugin system
 
-### First Run
+Each integration lives in its own directory under `src/plugins/`. A plugin exposes a composable (`index.ts`) and one or more widget components.
 
-1. **Install and start:**
-   ```bash
-   npm install
-   npm run dev
-   ```
+```
+src/
+├── core/
+│   ├── types.ts          — Plugin, Entity, LayoutConfig type definitions
+│   ├── useRegistry.ts    — Singleton registry: aggregates entities across plugins
+│   └── useLayout.ts      — Loads and parses yardbird.yaml; exposes tabs + plugin configs
+│
+├── plugins/
+│   ├── jmri/
+│   │   ├── index.ts                — useJmri composable (singleton)
+│   │   ├── ExtendedJmriClient.ts   — JMRI client subclass (named power sources)
+│   │   └── components/
+│   │       ├── ThrottleList.vue
+│   │       ├── ThrottleCard.vue
+│   │       ├── TurnoutList.vue
+│   │       ├── LightList.vue
+│   │       ├── RosterCard.vue
+│   │       └── LocomotiveHeader.vue
+│   ├── dccex/
+│   │   ├── index.ts                — useDccEx composable (singleton)
+│   │   └── components/
+│   │       └── TramWidget.vue
+│   └── homeassistant/
+│       ├── index.ts                — useHomeAssistant composable (singleton)
+│       └── components/
+│           └── SceneWidget.vue
+│
+├── components/           — Shared UI (not plugin-specific)
+│   ├── ConnectionSetup.vue
+│   └── PowerControl.vue
+│
+├── utils/
+│   └── logger.ts
+└── types/
+    ├── jmri.ts
+    └── homeAssistant.ts
 
-2. **Open http://localhost:5173 in your browser**
+public/
+└── yardbird.yaml         — Layout and connection configuration (edit this)
 
-3. **Configure connection** in the setup screen:
-   - Enter your JMRI hostname (e.g., `raspi-jmri.local`)
-   - Set port (default: `12080`)
-   - Enable secure connection if using HTTPS/WSS
-   - OR enable Mock Mode for demo without hardware
+proxy/
+└── dccex-ws-proxy.mjs    — WebSocket-to-TCP relay for DCC-EX
+```
 
-4. **Click Connect** - Your settings are saved in browser localStorage
+### Naming conventions
 
-### Connection Options
+- Plugin composables are in `plugins/<name>/index.ts`, exported as `use<Name>` (e.g. `useJmri`)
+- Widget components are `<Noun>Widget.vue` for plugin-specific views, `<Noun>List.vue` / `<Noun>Card.vue` for list/item patterns
+- Shared components (used by more than one plugin) live in `src/components/`
+- Tab IDs in `yardbird.yaml` must match keys in the `tabComponents` map in `App.vue`
 
-**Real JMRI Server:**
-- Host: Your JMRI server hostname or IP (e.g., `raspi-jmri.local`, `192.168.1.100`)
-- Port: `12080` (default JMRI WebSocket port)
-- Secure: Check if JMRI has SSL configured (uses `wss://` instead of `ws://`)
+---
 
-**Mock Mode (Demo/Testing):**
-- No JMRI hardware required
-- Simulated locomotives and controls
-- Perfect for testing UI changes or demos
+## Configuration
 
-**Debug Logging:**
-- Enable to see detailed logs in browser console
-- Useful for troubleshooting connection issues
+All layout and connection settings live in a single file: **`yardbird.yaml`**.
 
-Your settings are automatically saved and reloaded on next visit. Click the **Logout** button to return to the setup screen and change settings.
+The app fetches this file from `/yardbird.yaml` at startup and parses it in the browser. If the file is missing it falls back to safe defaults (JMRI only, three tabs).
+
+### Full schema
+
+```yaml
+# YardBird configuration
+
+debug: false  # Enable verbose logging in the browser console
+
+plugins:
+  jmri:
+    host: raspi-jmri.local   # JMRI server hostname or IP
+    port: 12080              # JMRI WebSocket port (default: 12080)
+    secure: false            # true = wss:// / https://
+    mock: false              # true = simulated data, no hardware needed
+
+  dccex:                     # Optional — remove or comment out to disable
+    enabled: true
+    host: 192.168.1.231      # DCC-EX CommandStation IP
+    port: 2560               # DCC-EX port (default: 2560; proxy listens on 2561)
+    pwmFreq: 3               # DC PWM frequency: 0=131Hz 1=490Hz 2=3.4kHz 3=Supersonic
+
+  homeassistant:             # Optional — remove or comment out to disable
+    enabled: true
+    url: http://homeassistant.local:8123
+    token: ''                # Long-Lived Access Token from HA Profile page
+    area: train_room         # HA area_id to filter entities
+
+tabs:
+  - id: throttles            # Must match a key in App.vue tabComponents
+    name: Locomotives        # Displayed in the tab bar
+    icon: i-mdi-train        # Any Iconify icon name
+
+  - id: turnouts
+    name: Turnouts
+    icon: i-mdi-source-branch
+
+  - id: lights
+    name: Lights
+    icon: i-mdi-lightbulb-outline
+
+  - id: trams                # Only meaningful when dccex plugin is enabled
+    name: Trams
+    icon: i-mdi-tram
+
+  - id: room                 # Only meaningful when homeassistant plugin is enabled
+    name: Room
+    icon: i-mdi-home
+```
+
+Tabs are rendered in the order they appear. Remove a tab entry to hide it entirely. Rename `name` freely — the `id` is what binds the tab to its component.
+
+### In development
+
+Edit `public/yardbird.yaml` directly. Vite serves the `public/` directory as static files, so the browser fetches the updated config on the next page load.
+
+```bash
+# 1. Edit the config
+$EDITOR public/yardbird.yaml
+
+# 2. Reload the browser — changes take effect immediately
+```
+
+For tram development (starts the DCC-EX proxy alongside Vite):
+```bash
+npm run dev:all
+```
+
+### In Docker / production
+
+The built image ships with the default `yardbird.yaml`. Override it by volume-mounting your own file over the default:
+
+Mount a `config/` directory next to your `compose.yaml` and place `yardbird.yaml` inside it:
+
+```
+your-deployment/
+├── compose.yaml
+└── config/
+    └── yardbird.yaml
+```
+
+**`compose.yaml`:**
+```yaml
+services:
+  yardbird:
+    image: yamanote1138/yardbird:latest
+    ports:
+      - "8080:80"
+    volumes:
+      - ./config:/config
+```
+
+```bash
+# 1. Create the config directory and copy the default
+mkdir -p config
+cp /path/to/yardbird/public/yardbird.yaml config/yardbird.yaml
+
+# 2. Edit it
+$EDITOR config/yardbird.yaml
+
+# 3. Deploy
+docker compose up -d
+```
+
+Changes to the config file take effect on the next browser page load — no container restart needed.
+
+**DCC-EX proxy** (if using tram control): set the `DCCEX_HOST` environment variable. The proxy starts automatically and listens on port 2561.
+
+```yaml
+environment:
+  - DCCEX_HOST=192.168.1.231
+ports:
+  - "8080:80"
+  - "2561:2561"
+```
+
+---
 
 ## Development
 
 ```bash
-# Install dependencies
-npm install
+npm install          # First time setup
 
-# Start dev server
-npm run dev
+npm run dev          # Vite dev server at http://localhost:5173
+npm run dev:all      # Vite + DCC-EX proxy
 
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Type-check
-npm run type-check
+npm run build        # Type-check + production build
+npm run type-check   # TypeScript only
+npm run preview      # Preview the production build
 ```
 
-The dev server will start at http://localhost:5173
+The dev server allows connections from any host (`host: true`) so you can test on mobile devices on the same network.
 
 ## Deployment
 
-### Docker (Recommended)
-
-The application features **runtime configuration** - no build-time environment variables needed! Configure your JMRI connection through the web UI on first launch.
-
-**Deploy with Docker:**
 ```bash
-docker compose up -d
-```
-Access at http://localhost:8080
+# Pull and run the pre-built image
+docker compose up -d          # http://localhost:8080
 
-**With DCC-EX tram support:**
-```bash
-# Set the DCC-EX CommandStation IP to enable the proxy
-DCCEX_HOST=192.168.1.231 docker compose up -d
-# Proxy listens on port 2561, relays to DCC-EX at port 2560
-```
+# Build from source
+docker compose up --build -d
 
-**Customize the port:**
-```bash
-# Use a different port (e.g., 3000)
+# Development with hot reload
+docker compose -f compose.dev.yaml up --build   # http://localhost:5173
+
+# Custom port
 PORT=3000 docker compose up -d
-
-# Or create a .env file
-echo "PORT=3000" > .env
-docker compose up -d
-```
-
-On first visit, you'll see a connection setup screen where you can:
-- Enter your JMRI server hostname and port
-- Enable Mock Mode for testing without hardware
-- Enable debug logging
-- All settings saved in browser localStorage
-
-**Development with hot reload:**
-```bash
-docker compose -f compose.dev.yaml up --build
-```
-Access at http://localhost:5173
-
-### Manual Deployment
-
-Build the app and serve the `dist/` folder from any static web server:
-
-```bash
-npm run build
-npx serve dist
-```
-
-Or use GitHub Pages, Netlify, Vercel, etc.
-
-## Features
-
-- **Power Control** - Track power on/off
-- **Throttle Control** - Speed, direction, and functions for locomotives
-- **Turnout Control** - Switch turnout positions
-- **Light Control** - Toggle LCC lights (works independently of track power)
-- **DC Tram Control** - Direct DCC-EX connection for DC tram loops (optional)
-- **Real-time Updates** - WebSocket connection for instant feedback
-- **Responsive Design** - Works on desktop, tablet, and mobile
-
-## Architecture
-
-This is a pure frontend single-page application (SPA) that connects directly to JMRI via WebSocket. There is no backend server required - the browser communicates directly with JMRI since they're on the same network.
-
-For DC tram control, an optional WebSocket-to-TCP proxy connects directly to a DCC-EX EX-CommandStation, bypassing JMRI. The proxy runs inside the same Docker container.
-
-```
-┌──────────────────────┐
-│   Browser (Vue 3)    │
-│                      │
-│  - Train controls    │
-│  - Power controls    │
-│  - Turnout controls  │
-│  - Light controls    │
-│  - Tram controls     │
-└───────┬─────────┬────┘
-        │         │
-        │ ws      │ ws
-        │         │
-        ▼         ▼
-┌────────────┐  ┌──────────────────┐
-│ JMRI :12080│  │ DCC-EX Proxy     │
-│ (DCC locos │  │ :2561            │
-│  turnouts  │  │  ┌─WiThrottle TCP│──→ DCC-EX :2560
-│  lights)   │  │  └─Native TCP    │──→ DCC-EX :2560
-└────────────┘  └──────────────────┘
 ```
 
 ## Troubleshooting
 
-**"Disconnected from JMRI" error:**
-- Verify JMRI is running
-- Check that the WebSocket server is enabled in JMRI preferences
-- Verify hostname/IP and port in connection settings
-- Verify browser and JMRI are on the same network
-- Click **Logout** to return to setup screen and change settings
-- Enable debug logging to see detailed connection info in console
+**Cannot connect to JMRI**
+- Verify the JMRI WebSocket server is enabled: *Preferences → Web Server → JSON WebSocket*
+- Confirm `host` and `port` in `yardbird.yaml` match your JMRI server
+- Browser and JMRI must be on the same network
+- Enable `debug: true` in `yardbird.yaml` and check the browser console
 
-**Locomotives not showing:**
-- Make sure locomotives are configured in JMRI roster
-- Enable debug logging and check browser console for errors
-- Try clicking Logout and reconnecting
+**Locomotives not showing**
+- Make sure locomotives are in the JMRI roster
+- Check the browser console for errors (enable `debug: true`)
 
-**Change connection settings:**
-- Click the **Logout** button in the header
-- This returns you to the connection setup screen
-- Enter new settings and reconnect
+**Tram control not responding**
+- Confirm `dccex.enabled: true` and correct `host`/`port` in `yardbird.yaml`
+- Verify the `trams` tab is in the `tabs` list
+- Check that `DCCEX_HOST` is set when running Docker (starts the proxy)
+
+**Config changes not appearing**
+- The app fetches `yardbird.yaml` once at startup — reload the page to pick up changes
+
+---
 
 ## License
 
