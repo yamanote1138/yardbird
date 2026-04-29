@@ -18,7 +18,7 @@
     "jmri-client": "^4.1.1",
     "js-yaml": "^4.1.1",
     "tailwindcss": "^4.2.1",
-    "vue": "^3.5.13",
+    "vue": "^3.5.33",
     "vue-router": "^5.0.6"
   },
   "devDependencies": {
