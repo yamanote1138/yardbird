@@ -9,9 +9,11 @@ plugins:
     port: 12080
     secure: false
     mock: false  # Set to true to use simulated data (no JMRI hardware required)
-    # tramPrefix: D  # System connection prefix for tram throttles (e.g. 'D' for DCC++).
-                     # Run getSystemConnections() to discover available prefixes.
-                     # Omit for single-connection layouts.
+    # tramPrefix: D    # System connection prefix for tram throttles (e.g. 'D' for DCC++).
+                       # Run getSystemConnections() to discover available prefixes.
+                       # Omit for single-connection layouts.
+    # tramPwmFreq: 3   # DC PWM frequency applied on acquire via F29/F30/F31:
+                       # 0=131Hz (default), 1=490Hz (F29), 2=3.4kHz (F30), 3=Supersonic (F31)
 
   # Uncomment and configure to enable Home Assistant scene control
   homeassistant:

@@ -20,7 +20,7 @@
             />
             <div v-else>
               <h3 class="text-base font-semibold">{{ config.label }}</h3>
-              <p class="text-sm text-neutral-400">{{ config.sublabel }}</p>
+              <p class="text-sm text-neutral-400">{{ config.sublabel }} ({{ pwmFreqLabel(config.address) }})</p>
             </div>
           </div>
           <UButton
@@ -116,6 +116,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed } from 'vue'
 import { useJmri } from '@/plugins/jmri'
+import { useLayout } from '@/core/useLayout'
 import { PowerState } from 'jmri-client'
 import { logger } from '@/utils/logger'
 import LocomotiveHeader from '@/plugins/jmri/components/LocomotiveHeader.vue'
@@ -126,11 +127,39 @@ const TRAM_CONFIGS = [
   { address: 31, label: 'Track 2', sublabel: 'Outer Loop' }
 ] as const
 
-const { jmriState, power, isConnected, acquireThrottle, releaseThrottle, setThrottleSpeed, setThrottleDirection } = useJmri()
+const { jmriState, power, isConnected, acquireThrottle, releaseThrottle, setThrottleSpeed, setThrottleDirection, setThrottleFunction } = useJmri()
+const { plugins } = useLayout()
 
 // JMRI speed scale: 0.0–1.0 mapped to 10 segments
 const powerLevels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
 const RAMP_TIME_PER_SEGMENT = 2000
+
+const PWM_FREQ_LABELS = ['131 Hz', '490 Hz', '3.4 kHz', 'Supersonic']
+
+// F29/F30/F31 function states for each frequency index
+const PWM_FREQ_FUNCTIONS = [
+  { F29: false, F30: false, F31: false }, // 0: 131 Hz (default)
+  { F29: true,  F30: false, F31: false }, // 1: ~490 Hz
+  { F29: false, F30: true,  F31: false }, // 2: ~3.4 kHz
+  { F29: false, F30: false, F31: true  }, // 3: Supersonic
+] as const
+
+const defaultPwmFreq = computed(() => plugins.value.jmri.tramPwmFreq ?? 3)
+const pwmFreqByAddress = reactive<Record<number, number>>({})
+
+function pwmFreqLabel(address: number): string {
+  const idx = pwmFreqByAddress[address] ?? defaultPwmFreq.value
+  return PWM_FREQ_LABELS[idx] ?? 'Unknown'
+}
+
+async function applyPwmFrequency(address: number, freqIndex: number): Promise<void> {
+  const fns = PWM_FREQ_FUNCTIONS[freqIndex]
+  if (!fns) return
+  await setThrottleFunction(address, 29, fns.F29)
+  await setThrottleFunction(address, 30, fns.F30)
+  await setThrottleFunction(address, 31, fns.F31)
+  logger.info(`[Tram] Set PWM frequency for address ${address}: ${PWM_FREQ_LABELS[freqIndex]}`)
+}
 
 const isRamping = reactive<Record<number, boolean>>({})
 const stopFlags = reactive<Record<number, boolean>>({})
@@ -153,11 +182,16 @@ function getSpeedPercent(address: number): number {
 }
 
 async function handleAcquire(address: number) {
+  const freq = defaultPwmFreq.value
+  pwmFreqByAddress[address] = freq
   await acquireThrottle(address)
+  // Apply PWM frequency after a short delay to ensure the throttle is ready
+  setTimeout(() => applyPwmFrequency(address, freq), 500)
 }
 
 async function handleRelease(address: number) {
   stopFlags[address] = true
+  delete pwmFreqByAddress[address]
   await releaseThrottle(address)
 }
 

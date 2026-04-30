@@ -5,7 +5,8 @@ export interface JmriPluginConfig {
   port: number
   secure?: boolean
   mock?: boolean
-  tramPrefix?: string // System connection prefix for tram (DC) throttles, e.g. 'D' for DCC++
+  tramPrefix?: string  // System connection prefix for tram (DC) throttles, e.g. 'D' for DCC++
+  tramPwmFreq?: number // DC PWM frequency on acquire: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic (default)
 }
 
 export interface HomeAssistantPluginConfig {
