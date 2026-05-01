@@ -5,12 +5,6 @@ services:
     restart: always
     ports:
       - ${PORT:-8080}:80
-      - ${DCCEX_WS_PORT:-2561}:2561
-    environment:
-      # DCC-EX proxy (controls the in-container TCP relay)
-      - DCCEX_HOST=${DCCEX_HOST:-}
-      - DCCEX_PORT=${DCCEX_PORT:-2560}
-      - DCCEX_WS_PORT=${DCCEX_WS_PORT:-2561}
     volumes:
       - ./config:/config
     healthcheck:

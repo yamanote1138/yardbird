@@ -62,7 +62,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, type Component } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
-import { useDccEx } from '@/plugins/dccex'
 import { useHomeAssistant } from '@/plugins/homeassistant'
 import { useLayout } from '@/core/useLayout'
 import { setDebugMode } from '@/utils/logger'
@@ -73,7 +72,7 @@ import PowerControl from '@/components/PowerControl.vue'
 import ThrottleList from '@/plugins/jmri/components/ThrottleList.vue'
 import TurnoutList from '@/plugins/jmri/components/TurnoutList.vue'
 import LightList from '@/plugins/jmri/components/LightList.vue'
-import TramWidget from '@/plugins/dccex/components/TramWidget.vue'
+import TramWidget from '@/plugins/jmri/components/TramWidget.vue'
 import SceneWidget from '@/plugins/homeassistant/components/SceneWidget.vue'
 
 const tabComponents: Record<string, Component> = {
@@ -86,7 +85,6 @@ const tabComponents: Record<string, Component> = {
 
 const layout = useLayout()
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
-const dccex = useDccEx()
 const ha = useHomeAssistant()
 
 const isInitialized = ref(false)
@@ -133,6 +131,8 @@ const handleConnect = async () => {
       protocol: jmri.secure ? 'wss' : 'ws',
       mockEnabled: jmri.mock ?? false,
       mockDelay: 50,
+      tramPrefix: jmri.tramPrefix,
+      powerZonesConfig: jmri.powerZones,
     }
 
     let connectionTimeout: NodeJS.Timeout | null = null
@@ -174,14 +174,6 @@ const handleConnect = async () => {
           logger.error('Failed to fetch roster:', error)
         }
 
-        const dccexCfg = plugins.dccex
-        if (dccexCfg?.enabled) {
-          const dccexUrl = `ws://${dccexCfg.host}:${dccexCfg.port}`
-          logger.info('Connecting to DCC-EX proxy at', dccexUrl)
-          dccex.setDefaultPwmFrequency(dccexCfg.pwmFreq ?? 3)
-          dccex.connect(dccexUrl)
-        }
-
         const haCfg = plugins.homeassistant
         if (haCfg?.enabled && haCfg.url && haCfg.token && haCfg.area) {
           const haWsUrl = haCfg.url.replace(/^http/, 'ws').replace(/\/?$/, '/api/websocket')
@@ -215,7 +207,6 @@ const handleConnect = async () => {
 const handleExit = () => {
   logger.info('Exiting to welcome screen')
   ha.disconnect()
-  dccex.disconnect()
   disconnect()
   isInitialized.value = false
   document.title = 'YardBird'

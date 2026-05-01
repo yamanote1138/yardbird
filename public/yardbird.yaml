@@ -8,21 +8,32 @@ plugins:
     host: raspi-jmri.local
     port: 12080
     secure: false
-    mock: false  # Set to true to use simulated data (no JMRI hardware required)
+    # Set to true to use simulated data (no JMRI hardware required)
+    mock: false
+    tramPrefix: D
+    tramPwmFreq: 3
+    # DC PWM frequency applied on acquire via F29/F30/F31:
+    # 0=131Hz (default), 1=490Hz (F29), 2=3.4kHz (F30), 3=Supersonic (F31)
 
-  # Uncomment and configure to enable DCC-EX tram control
-  dccex:
-    enabled: true
-    host: localhost  # WebSocket proxy host — always localhost (proxy runs alongside the app)
-    port: 2561       # Proxy WS port (hardware address goes in DCCEX_HOST env var)
-    pwmFreq: 3       # DC PWM frequency: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic
+    # Power zone buttons shown in the header toolbar.
+    # Option 1 — explicit zones (prefix "" = default JMRI connection):
+    powerZones:
+      - name: DCC
+        prefix: "L"
+      - name: Trams
+        prefix: D
+    # Option 2 — auto-discover from JMRI system connections:
+    # powerZones:
+    #   discover: true
+    # Option 3 — single combined power button (omit powerZones entirely)
 
   # Uncomment and configure to enable Home Assistant scene control
   homeassistant:
     enabled: true
     url: http://homeassistant.local:8123
     token: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiN2Y3YzJlMjk1ZGI0YjMxYjRjMGNmMjg0M2QyYTI5NyIsImlhdCI6MTc3NjYzODY4NCwiZXhwIjoyMDkxOTk4Njg0fQ.oohHNE_qv4m_jIyUQc44XGtruNWGAxNA_cZD5d6-1PM'  # from HA Profile → Long-Lived Access Tokens
-    area: train_room  # HA area_id to filter entities
+    # HA area_id to filter entities
+    area: train_room
 
 tabs:
   - id: throttles
@@ -37,12 +48,10 @@ tabs:
     name: Lights
     icon: i-mdi-lightbulb-outline
 
-  # Uncomment to add the DCC-EX tram tab (requires dccex plugin)
   - id: trams
     name: Trams
     icon: i-mdi-tram
 
-  # Uncomment to add the Home Assistant room tab (requires homeassistant plugin)
   - id: room
     name: Room
     icon: i-mdi-home

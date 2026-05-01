@@ -101,6 +101,7 @@ import { PowerState } from 'jmri-client'
 import type { Throttle } from '@/types/jmri'
 import { Direction } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'
+import { logger } from '@/utils/logger'
 
 const props = defineProps<{
   throttle: Throttle
@@ -283,7 +284,7 @@ function toggleFunction(functionKey: string) {
 
   const match = functionKey.match(/^F(\d+)$/)
   if (!match) {
-    console.error('Invalid function key format:', functionKey)
+    logger.error('Invalid function key format:', functionKey)
     return
   }
 

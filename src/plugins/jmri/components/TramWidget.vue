@@ -1,43 +1,5 @@
 <template>
   <div>
-    <!-- DCC-EX Connection Status -->
-    <UAlert
-      v-if="dccex.connectionState.value === 'connecting'"
-      color="info"
-      icon="i-heroicons-arrow-path"
-      title="Connecting to DCC-EX..."
-      class="mb-3"
-    />
-    <div v-else-if="!dccex.isConnected.value" class="flex items-center gap-2 mb-3">
-      <UAlert
-        color="warning"
-        icon="i-heroicons-exclamation-triangle"
-        title="DCC-EX not connected"
-        class="flex-1"
-      />
-      <UButton size="sm" color="warning" variant="outline" @click="dccex.retry()">
-        <template #leading>
-          <UIcon name="i-heroicons-arrow-path" />
-        </template>
-        Retry
-      </UButton>
-    </div>
-
-    <!-- DCC-EX Power Control -->
-    <div class="flex items-center gap-2 mb-3">
-      <UButton
-        :color="powerButtonColor"
-        @click="togglePower"
-        :disabled="!dccex.isConnected.value || isPowerBusy"
-      >
-        <template #leading>
-          <UIcon :name="powerButtonIcon" />
-        </template>
-        DCC-EX: {{ powerButtonText }}
-      </UButton>
-    </div>
-
-    <!-- Track Controls -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
       <UCard
         v-for="config in TRAM_CONFIGS"
@@ -57,12 +19,12 @@
               :disabled="true"
             />
             <div v-else>
-              <h3 class="text-base font-semibold">{{ getDccexLabel(config.address) || config.label }}</h3>
+              <h3 class="text-base font-semibold">{{ config.label }}</h3>
               <p class="text-sm text-neutral-400">{{ config.sublabel }} ({{ pwmFreqLabel(config.address) }})</p>
             </div>
           </div>
           <UButton
-            v-if="dccex.throttles.value.has(config.address)"
+            v-if="isAcquired(config.address)"
             size="xs"
             color="neutral"
             variant="ghost"
@@ -74,7 +36,7 @@
         </div>
 
         <!-- Acquire button (when not yet acquired) -->
-        <div v-if="!dccex.throttles.value.has(config.address)">
+        <div v-if="!isAcquired(config.address)">
           <UButton
             color="primary"
             class="w-full"
@@ -118,9 +80,9 @@
               :disabled="controlsDisabled || isRamping[config.address]"
             >
               <template #leading>
-                <UIcon :name="getThrottle(config.address).forward ? 'i-heroicons-arrow-right' : 'i-heroicons-arrow-left'" />
+                <UIcon :name="getThrottle(config.address).direction ? 'i-heroicons-arrow-right' : 'i-heroicons-arrow-left'" />
               </template>
-              {{ getThrottle(config.address).forward ? 'Forward' : 'Reverse' }}
+              {{ getThrottle(config.address).direction ? 'Forward' : 'Reverse' }}
             </UButton>
             <UButton
               class="flex-1"
@@ -145,7 +107,6 @@
               E-Stop
             </UButton>
           </div>
-
         </div>
       </UCard>
     </div>
@@ -153,109 +114,87 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed } from 'vue'
 import { useJmri } from '@/plugins/jmri'
-import { useDccEx } from '@/plugins/dccex'
-import type { DccExThrottle } from '@/plugins/dccex'
+import { useLayout } from '@/core/useLayout'
+import { PowerState } from 'jmri-client'
 import { logger } from '@/utils/logger'
 import LocomotiveHeader from '@/plugins/jmri/components/LocomotiveHeader.vue'
+import type { Throttle } from '@/types/jmri'
 
 const TRAM_CONFIGS = [
   { address: 30, label: 'Track 1', sublabel: 'Inner Loop' },
   { address: 31, label: 'Track 2', sublabel: 'Outer Loop' }
 ] as const
 
-// JMRI for roster images only
-const { jmriState } = useJmri()
+const { jmriState, power, isConnected, acquireThrottle, releaseThrottle, setThrottleSpeed, setThrottleDirection, setThrottleFunction } = useJmri()
+const { plugins } = useLayout()
 
-// DCC-EX for power and throttle control
-const dccex = useDccEx()
-
-const isPowerBusy = ref(false)
-watch(() => dccex.powerState.value, (newState, oldState) => {
-  isPowerBusy.value = false
-  if (newState === 'off' && oldState === 'on') {
-    for (const config of TRAM_CONFIGS) {
-      if (dccex.throttles.value.has(config.address)) {
-        handleRelease(config.address)
-      }
-    }
-  }
-})
-const isRamping = reactive<Record<number, boolean>>({})
-const stopFlags = reactive<Record<number, boolean>>({})
-const pwmFreqByAddress = reactive<Record<number, number>>({})
+// JMRI speed scale: 0.0–1.0 mapped to 10 segments
+const powerLevels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+const RAMP_TIME_PER_SEGMENT = 2000
 
 const PWM_FREQ_LABELS = ['131 Hz', '490 Hz', '3.4 kHz', 'Supersonic']
 
+// F29/F30/F31 function states for each frequency index
+const PWM_FREQ_FUNCTIONS = [
+  { F29: false, F30: false, F31: false }, // 0: 131 Hz (default)
+  { F29: true,  F30: false, F31: false }, // 1: ~490 Hz
+  { F29: false, F30: true,  F31: false }, // 2: ~3.4 kHz
+  { F29: false, F30: false, F31: true  }, // 3: Supersonic
+] as const
+
+const defaultPwmFreq = computed(() => plugins.value.jmri.tramPwmFreq ?? 3)
+const pwmFreqByAddress = reactive<Record<number, number>>({})
+
 function pwmFreqLabel(address: number): string {
-  const idx = pwmFreqByAddress[address] ?? dccex.getDefaultPwmFrequency()
+  const idx = pwmFreqByAddress[address] ?? defaultPwmFreq.value
   return PWM_FREQ_LABELS[idx] ?? 'Unknown'
 }
 
-// WiThrottle speed levels: 0-126 mapped to 10 segments
-const powerLevels = [13, 25, 38, 50, 63, 76, 88, 101, 113, 126]
-const RAMP_TIME_PER_SEGMENT = 2000
+async function applyPwmFrequency(address: number, freqIndex: number): Promise<void> {
+  const fns = PWM_FREQ_FUNCTIONS[freqIndex]
+  if (!fns) return
+  await setThrottleFunction(address, 29, fns.F29)
+  await setThrottleFunction(address, 30, fns.F30)
+  await setThrottleFunction(address, 31, fns.F31)
+  logger.info(`[Tram] Set PWM frequency for address ${address}: ${PWM_FREQ_LABELS[freqIndex]}`)
+}
+
+const isRamping = reactive<Record<number, boolean>>({})
+const stopFlags = reactive<Record<number, boolean>>({})
 
 const controlsDisabled = computed(() => {
-  return !dccex.isConnected.value || dccex.powerState.value !== 'on'
+  return !isConnected.value || power.value !== PowerState.ON
 })
 
-// Power button state
-const powerButtonColor = computed(() => {
-  if (dccex.powerState.value === 'on') return 'primary'
-  if (dccex.powerState.value === 'off') return 'neutral'
-  return 'warning'
-})
-
-const powerButtonText = computed(() => {
-  if (dccex.powerState.value === 'on') return 'ON'
-  if (dccex.powerState.value === 'off') return 'OFF'
-  return 'UNKNOWN'
-})
-
-const powerButtonIcon = computed(() => {
-  if (dccex.powerState.value === 'on') return 'i-heroicons-bolt'
-  if (dccex.powerState.value === 'off') return 'i-mdi-power'
-  return 'i-heroicons-question-mark-circle'
-})
-
-function getDccexLabel(address: number): string | undefined {
-  return dccex.roster.value.find(e => e.address === address)?.name
+function isAcquired(address: number): boolean {
+  return jmriState.value.throttles.has(address)
 }
 
-function togglePower() {
-  isPowerBusy.value = true
-  dccex.setPower(dccex.powerState.value !== 'on')
-}
-
-function getThrottle(address: number): DccExThrottle {
-  return dccex.throttles.value.get(address)!
+function getThrottle(address: number): Throttle {
+  return jmriState.value.throttles.get(address)!
 }
 
 function getSpeedPercent(address: number): number {
-  const throttle = dccex.throttles.value.get(address)
-  return throttle ? Math.round((throttle.speed / 126) * 100) : 0
+  const throttle = jmriState.value.throttles.get(address)
+  return throttle ? Math.round(throttle.speed * 100) : 0
 }
 
-function handleAcquire(address: number) {
-  const freq = dccex.getDefaultPwmFrequency()
+async function handleAcquire(address: number) {
+  const freq = defaultPwmFreq.value
   pwmFreqByAddress[address] = freq
-  dccex.acquireThrottle(address, false)
-  setTimeout(() => {
-    dccex.setPwmFrequency(address, freq)
-  }, 500)
+  await acquireThrottle(address)
+  // Apply PWM frequency after a short delay to ensure the throttle is ready
+  setTimeout(() => applyPwmFrequency(address, freq), 500)
 }
 
-function handleRelease(address: number) {
+async function handleRelease(address: number) {
   stopFlags[address] = true
-  dccex.setSpeed(address, 0)
-  dccex.releaseThrottle(address, false)
+  delete pwmFreqByAddress[address]
+  await releaseThrottle(address)
 }
 
-/**
- * Speed button styling — same zone logic as ThrottleCard
- */
 function getSpeedButtonClass(address: number, level: number, index: number): string {
   const currentSpeed = getThrottle(address).speed
 
@@ -279,9 +218,6 @@ function getSpeedButtonClass(address: number, level: number, index: number): str
   return 'bg-neutral-700'
 }
 
-/**
- * Set power level with segment-based ramping
- */
 async function handleSetPowerLevel(address: number, clickedLevel: number, clickedIndex: number) {
   if (isRamping[address]) return
 
@@ -329,13 +265,11 @@ async function handleSetPowerLevel(address: number, clickedLevel: number, clicke
     const steps = Math.max(5, Math.ceil(duration / interval))
 
     for (let i = 1; i <= steps; i++) {
-      if (stopFlags[address]) {
-        break
-      }
+      if (stopFlags[address]) break
 
       const t = i / steps
-      const speed = Math.round(currentSpeed + (targetSpeedValue - currentSpeed) * t)
-      dccex.setSpeed(address, speed)
+      const speed = currentSpeed + (targetSpeedValue - currentSpeed) * t
+      await setThrottleSpeed(address, speed)
 
       if (i < steps) {
         await new Promise(resolve => setTimeout(resolve, interval))
@@ -343,7 +277,7 @@ async function handleSetPowerLevel(address: number, clickedLevel: number, clicke
     }
 
     if (!stopFlags[address]) {
-      dccex.setSpeed(address, targetSpeedValue)
+      await setThrottleSpeed(address, targetSpeedValue)
     }
   } finally {
     isRamping[address] = false
@@ -353,33 +287,33 @@ async function handleSetPowerLevel(address: number, clickedLevel: number, clicke
 async function handleToggleDirection(address: number) {
   const throttle = getThrottle(address)
   const currentSpeed = throttle.speed
-  const newForward = !throttle.forward
+  const newForward = !throttle.direction
 
   if (currentSpeed > 0) {
-    // Ramp down, pause, flip, ramp back up
-    const currentIndex = powerLevels.findIndex(level => Math.abs(level - currentSpeed) < 2) || 0
+    const currentIndex = powerLevels.findIndex(level => Math.abs(level - currentSpeed) < 0.05)
     await handleSetPowerLevel(address, powerLevels[0], 0)
     await new Promise(resolve => setTimeout(resolve, 1800))
-    dccex.setDirection(address, newForward)
-    await handleSetPowerLevel(address, currentSpeed, currentIndex)
+    await setThrottleDirection(address, newForward)
+    if (currentIndex >= 0) {
+      await handleSetPowerLevel(address, currentSpeed, currentIndex)
+    }
   } else {
-    dccex.setDirection(address, newForward)
+    await setThrottleDirection(address, newForward)
   }
 }
 
 async function handleBrake(address: number) {
-  // Interrupt any in-progress ramp, then ramp down to zero
   stopFlags[address] = true
-  // Wait for current ramp to finish
   while (isRamping[address]) {
     await new Promise(resolve => setTimeout(resolve, 50))
   }
   await handleSetPowerLevel(address, powerLevels[0], 0)
 }
 
-function handleEmergencyStop(address: number) {
+async function handleEmergencyStop(address: number) {
   stopFlags[address] = true
-  dccex.eStop(address)
+  logger.info(`[Tram] Emergency stop: address ${address}`)
+  await setThrottleSpeed(address, 0)
 }
 </script>
 
