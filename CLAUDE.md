@@ -16,7 +16,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 22+** required
 
 ### Current Version
-v6.2.0 — Per-connection power zones + JMRI-native tram control + jmri-client 4.2
+v7.0.0 — Per-connection power zones + JMRI-native tram control + jmri-client 4.2
 
 ## User Context & Preferences
 
