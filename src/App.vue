@@ -70,23 +70,28 @@
       </div>
     </div>
 
-    <!-- Scrollable Content -->
-    <div class="px-4 md:px-6 pt-2 sm:pt-3 md:pt-4">
-      <template v-for="tab in tabs" :key="tab.id">
-        <div v-show="activeTab === tab.id">
-          <!-- Canvas mode: tab has widgets, or edit mode is active -->
-          <TabCanvas
-            v-if="tab.widgets.length > 0 || editMode"
-            :tab="tab"
-            @configure="openWidgetConfig"
-          />
-          <!-- Legacy fallback: empty tab in run mode → existing list components -->
-          <component
-            v-else-if="tabComponents[tab.id]"
-            :is="tabComponents[tab.id]"
-          />
-        </div>
-      </template>
+    <!-- Content area: palette sidebar + tab canvas -->
+    <div class="flex min-h-0 overflow-hidden">
+      <WidgetPalette />
+
+      <div class="flex-1 overflow-auto px-4 md:px-6 pt-2 sm:pt-3 md:pt-4 min-w-0">
+        <template v-for="tab in tabs" :key="tab.id">
+          <div v-show="activeTab === tab.id">
+            <!-- Canvas mode: tab has widgets, or edit mode is active -->
+            <TabCanvas
+              v-if="tab.widgets.length > 0 || editMode"
+              :tab="tab"
+              @configure="openWidgetConfig"
+              @configure-new="openNewWidgetConfig"
+            />
+            <!-- Legacy fallback: empty tab in run mode → existing list components -->
+            <component
+              v-else-if="tabComponents[tab.id]"
+              :is="tabComponents[tab.id]"
+            />
+          </div>
+        </template>
+      </div>
     </div>
   </div>
 </template>
@@ -103,6 +108,7 @@ import { version as appVersion } from '../package.json'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
 import PowerControl from '@/components/PowerControl.vue'
 import TabCanvas from '@/components/TabCanvas.vue'
+import WidgetPalette from '@/widgets/WidgetPalette.vue'
 import ThrottleList from '@/plugins/jmri/components/ThrottleList.vue'
 import TurnoutList from '@/plugins/jmri/components/TurnoutList.vue'
 import LightList from '@/plugins/jmri/components/LightList.vue'
@@ -118,8 +124,14 @@ const tabComponents: Record<string, Component> = {
   room:      SceneWidget,
 }
 
+import type { WidgetInstance } from '@/core/types'
+
 function openWidgetConfig(_widgetId: string) {
   // Phase 6 implements this
+}
+
+function openNewWidgetConfig(_widget: WidgetInstance) {
+  // Phase 6 implements this: show config modal, then call canvas.commitWidget()
 }
 
 const cfg = useConfig()

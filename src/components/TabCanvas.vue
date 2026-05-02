@@ -31,6 +31,7 @@ const props = defineProps<{ tab: TabConfig }>()
 
 const emit = defineEmits<{
   configure: [widgetId: string]
+  'configure-new': [widget: WidgetInstance]
 }>()
 
 const { editMode } = useEditMode()
@@ -154,12 +155,44 @@ function syncPositions(nodes: GridStackNode[]) {
 
 function handlePaletteDrop(nodes: GridStackNode[]) {
   for (const node of nodes) {
-    const widgetType = (node.el as HTMLElement)?.dataset.gsWidgetType as WidgetType | undefined
+    const el = node.el as HTMLElement | undefined
+    const widgetType = el?.dataset.gsWidgetType as WidgetType | undefined
     if (!widgetType) continue
-    // Phase 5 will handle this properly; for now remove the dropped element
-    // (palette drop creates a placeholder that needs proper widget mounting)
-    grid?.removeWidget(node.el!, true)
+
+    // Remove the placeholder Gridstack created from the palette clone
+    grid?.removeWidget(el!, true)
+
+    const def = getWidgetDef(widgetType)
+    const newWidget: WidgetInstance = {
+      id: crypto.randomUUID(),
+      type: widgetType,
+      grid: {
+        x: node.x ?? 0,
+        y: node.y ?? 0,
+        w: def.defaultSize.w,
+        h: def.defaultSize.h,
+      },
+      config: {},
+    }
+
+    if (def.hasConfig) {
+      // Store the pending widget; Phase 6 will open the config modal.
+      // For now, add with empty config so the widget appears immediately.
+      emit('configure-new', newWidget)
+    } else {
+      commitWidget(newWidget)
+    }
   }
+}
+
+function commitWidget(widget: WidgetInstance) {
+  renderedWidgets.value.push(widget)
+  const tabs = cfg.tabs.value.map(t => {
+    if (t.id !== props.tab.id) return t
+    return { ...t, widgets: [...t.widgets, widget] }
+  })
+  cfg.saveTabs(tabs)
+  nextTick(() => addGridWidget(widget))
 }
 
 function handleRemove(widgetId: string) {
@@ -223,5 +256,5 @@ function addWidget(widget: WidgetInstance) {
   nextTick(() => addGridWidget(widget))
 }
 
-defineExpose({ addWidget })
+defineExpose({ addWidget, commitWidget })
 </script>
