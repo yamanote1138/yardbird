@@ -70,6 +70,9 @@
       </div>
     </div>
 
+    <!-- Widget config modal (global, rendered once) -->
+    <WidgetConfigModal />
+
     <!-- Content area: palette sidebar + tab canvas -->
     <div class="flex min-h-0 overflow-hidden">
       <WidgetPalette />
@@ -80,6 +83,7 @@
             <!-- Canvas mode: tab has widgets, or edit mode is active -->
             <TabCanvas
               v-if="tab.widgets.length > 0 || editMode"
+              :ref="(el) => { if (el) canvasRefs[tab.id] = el as InstanceType<typeof TabCanvas> }"
               :tab="tab"
               @configure="openWidgetConfig"
               @configure-new="openNewWidgetConfig"
@@ -109,6 +113,7 @@ import ConnectionSetup from '@/components/ConnectionSetup.vue'
 import PowerControl from '@/components/PowerControl.vue'
 import TabCanvas from '@/components/TabCanvas.vue'
 import WidgetPalette from '@/widgets/WidgetPalette.vue'
+import WidgetConfigModal from '@/widgets/WidgetConfigModal.vue'
 import ThrottleList from '@/plugins/jmri/components/ThrottleList.vue'
 import TurnoutList from '@/plugins/jmri/components/TurnoutList.vue'
 import LightList from '@/plugins/jmri/components/LightList.vue'
@@ -125,23 +130,41 @@ const tabComponents: Record<string, Component> = {
 }
 
 import type { WidgetInstance } from '@/core/types'
-
-function openWidgetConfig(_widgetId: string) {
-  // Phase 6 implements this
-}
-
-function openNewWidgetConfig(_widget: WidgetInstance) {
-  // Phase 6 implements this: show config modal, then call canvas.commitWidget()
-}
+import { useWidgetConfig } from '@/composables/useWidgetConfig'
 
 const cfg = useConfig()
 const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
+const wc = useWidgetConfig()
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
 const ha = useHomeAssistant()
 
 const isInitialized = ref(false)
 const activeTab = ref('')
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
+
+// Map of tab id → canvas ref (populated by template)
+const canvasRefs = ref<Record<string, InstanceType<typeof TabCanvas>>>({})
+
+function openWidgetConfig(widgetId: string) {
+  const tab = cfg.tabs.value.find(t => t.widgets.some(w => w.id === widgetId))
+  if (!tab) return
+  const widget = tab.widgets.find(w => w.id === widgetId)!
+  wc.openForEdit(widgetId, widget.type, widget.config, (newConfig) => {
+    cfg.saveTabs(cfg.tabs.value.map(t => ({
+      ...t,
+      widgets: t.widgets.map(w => w.id === widgetId ? { ...w, config: newConfig } : w),
+    })))
+  })
+}
+
+function openNewWidgetConfig(widget: WidgetInstance) {
+  const canvas = canvasRefs.value[activeTab.value]
+  wc.openForNew(
+    widget,
+    (configured) => canvas?.commitWidget(configured),
+    () => {},
+  )
+}
 
 const configLoading = computed(() => cfg.loading.value)
 const tabs = computed(() => cfg.tabs.value)
