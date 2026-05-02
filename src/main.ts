@@ -4,6 +4,7 @@ import ui from '@nuxt/ui/vue-plugin'
 import App from './App.vue'
 
 import './main.css'
+import 'gridstack/dist/gridstack.min.css'
 
 const router = createRouter({
   history: createWebHashHistory(),
