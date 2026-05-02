@@ -323,14 +323,14 @@ Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
 
 Branch: `feat/visual-configurator`
 
-- [ ] **Phase 1** — Config persistence layer: `src/core/types.ts` (add WidgetInstance/StoredConfig), `src/core/useConfig.ts` (new), update `App.vue`
-- [ ] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts` (new), edit button in `App.vue` header
-- [ ] **Phase 3** — Widget registry + WidgetFrame: `src/widgets/registry.ts` (new), `src/widgets/WidgetFrame.vue` (new), extract `TurnoutWidget.vue` and `LightWidget.vue`
-- [ ] **Phase 4** — Gridstack canvas: install `gridstack`, `src/components/TabCanvas.vue` (new), replace tabComponents in `App.vue`
-- [ ] **Phase 5** — Widget palette + drag-to-grid: `src/widgets/WidgetPalette.vue` (new), `GridStack.setupDragIn`, App layout sidebar
-- [ ] **Phase 6** — Widget config modals: `src/composables/useWidgetConfig.ts` (new), `src/widgets/WidgetConfigModal.vue` + sub-forms
-- [ ] **Phase 7** — Tab management: install `vue-draggable-plus`, `src/components/TabManager.vue` (new)
-- [ ] **Phase 8** — Connection management UI: extend `ConnectionSetup.vue`
+- [x] **Phase 1** — Config persistence layer: `src/core/types.ts` (add WidgetInstance/StoredConfig), `src/core/useConfig.ts` (new), update `App.vue`
+- [x] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts` (new), edit button in `App.vue` header
+- [x] **Phase 3** — Widget registry + WidgetFrame: `src/widgets/registry.ts` (new), `src/widgets/WidgetFrame.vue` (new), extract `TurnoutWidget.vue` and `LightWidget.vue`
+- [x] **Phase 4** — Gridstack canvas: install `gridstack`, `src/components/TabCanvas.vue` (new), replace tabComponents in `App.vue`
+- [x] **Phase 5** — Widget palette + drag-to-grid: `src/widgets/WidgetPalette.vue` (new), `GridStack.setupDragIn`, App layout sidebar
+- [x] **Phase 6** — Widget config modals: `src/composables/useWidgetConfig.ts` (new), `src/widgets/WidgetConfigModal.vue` + sub-forms
+- [x] **Phase 7** — Tab management: install `vue-draggable-plus`, `src/components/TabManager.vue` (new)
+- [x] **Phase 8** — Connection management UI: extend `ConnectionSetup.vue`
 
 ---
 
