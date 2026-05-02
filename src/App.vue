@@ -19,9 +19,24 @@
     <!-- Sticky Header Section -->
     <div class="sticky top-0 z-[1000] bg-neutral-950 header-shadow">
       <div class="px-4 md:px-6 py-2 sm:py-3 pb-2">
-        <!-- Header -->
-        <h1 class="text-lg md:text-xl font-semibold mb-1">{{ railroadName }}</h1>
-        <p class="text-neutral-400 text-sm md:text-base mb-2 sm:mb-3">{{ connectionSubtitle }}</p>
+        <!-- Header row -->
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <h1 class="text-lg md:text-xl font-semibold mb-1">{{ railroadName }}</h1>
+            <p class="text-neutral-400 text-sm md:text-base mb-2 sm:mb-3">{{ connectionSubtitle }}</p>
+          </div>
+          <!-- Edit mode toggle -->
+          <button
+            :title="editMode ? 'Exit edit mode' : 'Edit layout'"
+            class="flex-shrink-0 mt-0.5 p-1.5 rounded transition-colors"
+            :class="editMode
+              ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
+              : 'text-white/30 hover:text-white/60 hover:bg-white/5'"
+            @click="toggleEditMode"
+          >
+            <UIcon :name="editMode ? 'i-mdi-lock-open' : 'i-mdi-pencil'" class="w-5 h-5" />
+          </button>
+        </div>
 
         <!-- Power Control with integrated status -->
         <PowerControl @logout="handleExit" />
@@ -29,20 +44,29 @@
 
       <!-- Tab Navigation -->
       <div class="border-b border-white/10">
-        <ul class="flex flex-wrap -mb-px text-sm md:text-base font-medium text-center">
-          <li v-for="tab in tabs" :key="tab.id" class="me-2">
-            <button
-              class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
-              :class="activeTab === tab.id
-                ? 'text-blue-400 border-blue-400'
-                : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
-              @click="activeTab = tab.id"
-            >
-              <UIcon :name="tab.icon" class="w-4 h-4 md:w-5 md:h-5 me-2" />
-              {{ tab.name }}
-            </button>
-          </li>
-        </ul>
+        <div class="flex items-center">
+          <ul class="flex flex-wrap -mb-px text-sm md:text-base font-medium text-center flex-1">
+            <li v-for="tab in tabs" :key="tab.id" class="me-2">
+              <button
+                class="inline-flex items-center justify-center p-4 md:px-5 md:py-4 border-b-2 rounded-t transition-colors group"
+                :class="activeTab === tab.id
+                  ? 'text-blue-400 border-blue-400'
+                  : 'border-transparent text-white/50 hover:text-white/80 hover:border-white/30'"
+                @click="activeTab = tab.id"
+              >
+                <UIcon :name="tab.icon" class="w-4 h-4 md:w-5 md:h-5 me-2" />
+                {{ tab.name }}
+              </button>
+            </li>
+          </ul>
+
+          <!-- Edit mode indicator + add tab (Phase 7 adds full TabManager) -->
+          <div v-if="editMode" class="flex items-center gap-2 px-3 pb-px flex-shrink-0">
+            <span class="text-xs text-amber-400 font-medium px-1.5 py-0.5 rounded bg-amber-400/10 border border-amber-400/20">
+              Editing
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -64,6 +88,7 @@ import { ref, computed, watch, type Component } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
 import { useHomeAssistant } from '@/plugins/homeassistant'
 import { useConfig } from '@/core/useConfig'
+import { useEditMode } from '@/composables/useEditMode'
 import { setDebugMode } from '@/utils/logger'
 import { logger } from '@/utils/logger'
 import { version as appVersion } from '../package.json'
@@ -84,6 +109,7 @@ const tabComponents: Record<string, Component> = {
 }
 
 const cfg = useConfig()
+const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
 const ha = useHomeAssistant()
 
@@ -209,6 +235,7 @@ const handleConnect = async () => {
 
 const handleExit = () => {
   logger.info('Exiting to welcome screen')
+  exitEditMode()
   ha.disconnect()
   disconnect()
   isInitialized.value = false
