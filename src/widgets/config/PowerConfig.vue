@@ -34,12 +34,12 @@ import { useJmri } from '@/plugins/jmri'
 const props = defineProps<{ config: Record<string, unknown> }>()
 const emit = defineEmits<{ update: [config: Record<string, unknown>] }>()
 
-const { resolvedZones } = useJmri()
+const { commandStations } = useJmri()
 
 const label  = ref<string>((props.config.label  as string) ?? '')
 const prefix = ref<string>((props.config.prefix as string) ?? '')
 
-const zoneOptions = resolvedZones
+const zoneOptions = commandStations
 
 watch([label, prefix], ([l, p]) => {
   emit('update', { label: l, prefix: p })

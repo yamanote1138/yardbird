@@ -7,6 +7,7 @@
     <RosterCard
       v-else-if="entry"
       :entry="entry"
+      :command-station="commandStation"
     />
     <div v-else class="p-3">
       <UAlert
@@ -24,10 +25,10 @@ import { useJmri } from '@/plugins/jmri'
 import ThrottleCard from './ThrottleCard.vue'
 import RosterCard from './RosterCard.vue'
 
-const props = defineProps<{ address: number }>()
+const props = defineProps<{ address: number; commandStation?: string }>()
 
-const { jmriState, locoRoster } = useJmri()
+const { jmriState } = useJmri()
 
 const throttle = computed(() => jmriState.value.throttles.get(props.address))
-const entry    = computed(() => locoRoster.value.find(e => e.address === props.address))
+const entry    = computed(() => jmriState.value.roster.get(props.address))
 </script>

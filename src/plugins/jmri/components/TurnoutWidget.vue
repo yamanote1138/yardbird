@@ -32,8 +32,8 @@ const turnout = computed(() => jmriState.value.turnouts.get(props.name))
 
 const buttonColor = computed(() => {
   switch (turnout.value?.state) {
-    case TurnoutState.CLOSED:        return 'primary'
-    case TurnoutState.THROWN:        return 'info'
+    case TurnoutState.THROWN:        return 'primary'
+    case TurnoutState.CLOSED:        return 'neutral'
     case TurnoutState.INCONSISTENT:  return 'error'
     default:                         return 'warning'
   }

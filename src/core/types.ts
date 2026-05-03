@@ -1,24 +1,24 @@
 // ── Layout / YAML config ─────────────────────────────────────────────────────
 
-export interface PowerZone {
+export interface CommandStation {
   name: string
   prefix: string  // empty string = default JMRI connection
 }
 
-// powerZones in YAML can be:
-//   - PowerZone[]              → use these explicit zones
-//   - { discover: true }       → auto-discover via getSystemConnections()
+// commandStations in YAML can be:
+//   - CommandStation[]          → use these explicit stations
+//   - { discover: true }        → auto-discover via getSystemConnections()
 //   - missing / { discover: false } → single default power button (fallback)
-export type PowerZonesConfig = PowerZone[] | { discover: boolean }
+export type CommandStationsConfig = CommandStation[] | { discover: boolean }
 
 export interface JmriPluginConfig {
   host: string
   port: number
   secure?: boolean
   mock?: boolean
-  tramPrefix?: string  // System connection prefix for tram (DC) throttles, e.g. 'D' for DCC++
-  tramPwmFreq?: number // DC PWM frequency on acquire: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic (default)
-  powerZones?: PowerZonesConfig
+  tramPrefix?: string  // kept for legacy PWM power-zone routing; not used for throttle acquisition
+  tramPwmFreq?: number
+  commandStations?: CommandStationsConfig
 }
 
 export interface HomeAssistantPluginConfig {
@@ -35,7 +35,6 @@ export type WidgetType =
   | 'jmri-throttle'
   | 'jmri-turnout'
   | 'jmri-light'
-  | 'jmri-tram'
   | 'ha-entity'
 
 export interface WidgetGridPos {

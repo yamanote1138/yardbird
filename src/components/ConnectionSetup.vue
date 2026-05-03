@@ -192,7 +192,7 @@ function saveJmri() {
     secure:      !!jmriForm.secure,
     mock:        !!jmriForm.mock,
     tramPrefix:  jmriForm.tramPrefix || undefined,
-    powerZones:  jmri.value?.powerZones,
+    commandStations: jmri.value?.commandStations,
     tramPwmFreq: jmri.value?.tramPwmFreq,
   }
   cfg.saveConnections({ ...cfg.connections.value, jmri: updated })

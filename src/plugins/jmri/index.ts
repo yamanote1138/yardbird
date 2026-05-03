@@ -8,7 +8,7 @@ import { logger } from '@/utils/logger'
 import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
 import { JmriClient, PowerState, LightState } from 'jmri-client'
-import type { PowerZone, PowerZonesConfig } from '@/core/types'
+import type { CommandStation, CommandStationsConfig } from '@/core/types'
 
 // Connection state enum
 export enum ConnectionState {
@@ -24,7 +24,7 @@ export interface JmriConnectionSettings {
   mockEnabled: boolean
   mockDelay?: number
   tramPrefix?: string // System connection prefix for tram throttles, e.g. 'D' for DCC++
-  powerZonesConfig?: PowerZonesConfig
+  commandStationsConfig?: CommandStationsConfig
 }
 
 // Tram DCC addresses — these are filtered out of the main locomotive roster
@@ -47,11 +47,11 @@ let jmriClient: JmriClient | null = null
 let currentSettings: JmriConnectionSettings | null = null
 const throttleIds = new Map<number, string>() // address -> throttleId mapping
 
-// Power zone state — populated on connect based on powerZonesConfig
-const resolvedZones = ref<PowerZone[]>([])
+// Command station state — populated on connect based on commandStationsConfig
+const commandStations = ref<CommandStation[]>([])
 const powerByPrefix = ref<Map<string, PowerState>>(new Map())
 
-async function resolvePowerZones(config: PowerZonesConfig | undefined): Promise<PowerZone[]> {
+async function resolveCommandStations(config: CommandStationsConfig | undefined): Promise<CommandStation[]> {
   if (!config) return []
   if (Array.isArray(config)) return config
   if (!config.discover) return []
@@ -68,9 +68,9 @@ async function resolvePowerZones(config: PowerZonesConfig | undefined): Promise<
 }
 
 async function refreshAllZonePower(): Promise<void> {
-  if (!jmriClient || resolvedZones.value.length === 0) return
+  if (!jmriClient || commandStations.value.length === 0) return
   const newMap = new Map<string, PowerState>()
-  for (const zone of resolvedZones.value) {
+  for (const zone of commandStations.value) {
     try {
       const state = zone.prefix
         ? await jmriClient.getPower(zone.prefix)
@@ -144,9 +144,9 @@ export function useJmri() {
 
       // Resolve power zones and fetch per-zone power state
       try {
-        resolvedZones.value = await resolvePowerZones(currentSettings?.powerZonesConfig)
-        if (resolvedZones.value.length > 0) {
-          logger.info(`Power zones resolved: ${resolvedZones.value.map(z => `"${z.name}" (prefix="${z.prefix}")`).join(', ')}`)
+        commandStations.value = await resolveCommandStations(currentSettings?.commandStationsConfig)
+        if (commandStations.value.length > 0) {
+          logger.info(`Command stations resolved: ${commandStations.value.map(z => `"${z.name}" (prefix="${z.prefix}")`).join(', ')}`)
           await refreshAllZonePower()
         }
       } catch (error) {
@@ -387,7 +387,7 @@ export function useJmri() {
       const powerState = state === 'on' ? PowerState.ON : PowerState.OFF
       await jmriClient.setPower(powerState, prefix)
 
-      if (resolvedZones.value.length > 0 && prefix !== undefined) {
+      if (commandStations.value.length > 0 && prefix !== undefined) {
         // JMRI doesn't reliably return named connection power via prefix queries,
         // so apply the state optimistically — the power:changed event confirming
         // the command is the source of truth.
@@ -653,7 +653,7 @@ export function useJmri() {
   /**
    * Acquire a throttle for control
    */
-  async function acquireThrottle(address: number) {
+  async function acquireThrottle(address: number, prefix?: string) {
     if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
       logger.error('Cannot acquire throttle: JMRI client not connected')
       return
@@ -673,10 +673,6 @@ export function useJmri() {
     }
 
     const rosterEntry = jmriState.value.roster.get(address)!
-
-    // Use tramPrefix for known tram addresses
-    const isTram = (TRAM_ADDRESSES as readonly number[]).includes(address)
-    const prefix = isTram ? currentSettings?.tramPrefix : undefined
 
     try {
       logger.info(`Acquiring throttle for ${rosterEntry.name} (address ${address}${prefix ? `, prefix ${prefix}` : ''})`)
@@ -898,6 +894,14 @@ export function useJmri() {
     }
   }
 
+  async function applyCommandStationsConfig(config: CommandStationsConfig | undefined): Promise<void> {
+    commandStations.value = await resolveCommandStations(config)
+    if (commandStations.value.length > 0) {
+      logger.info(`Command stations updated: ${commandStations.value.map(z => `"${z.name}" (prefix="${z.prefix}")`).join(', ')}`)
+      if (jmriClient) await refreshAllZonePower()
+    }
+  }
+
   /**
    * Disconnect from JMRI and clean up
    */
@@ -925,7 +929,7 @@ export function useJmri() {
     jmriState.value.power = 0
     railroadName.value = 'Model Railroad'
     jmriVersion.value = ''
-    resolvedZones.value = []
+    commandStations.value = []
     powerByPrefix.value = new Map()
   }
 
@@ -936,7 +940,7 @@ export function useJmri() {
     isServerOnline,
     railroadName,
     jmriVersion,
-    resolvedZones,
+    commandStations,
     powerByPrefix,
 
     // Computed
@@ -956,6 +960,7 @@ export function useJmri() {
     // Methods
     initialize,
     disconnect,
+    applyCommandStationsConfig,
     setPower,
     setThrottleSpeed,
     setThrottleDirection,

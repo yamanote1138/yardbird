@@ -1,103 +1,74 @@
-# yardbird.example.yaml
+# YardBird — Example Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 # Copy this file to:
 #   Docker / production  →  config/yardbird.yaml  (volume-mounted at /config)
 #   Development          →  public/yardbird.yaml
 #
-# The app fetches yardbird.yaml once at startup.
-# Reload the browser page to pick up any changes.
+# This file provides factory defaults. Once you connect and build your
+# dashboard through the visual editor, your layout is saved in the browser's
+# localStorage. This file is only read again if you reset to defaults.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Enable verbose logging in the browser console.
-# Useful when troubleshooting connections or unexpected behaviour.
+# Enable verbose logging in the browser console (useful for troubleshooting)
 debug: false
 
 plugins:
 
-  # ── JMRI ──────────────────────────────────────────────────────────────────
+  # ── JMRI ────────────────────────────────────────────────────────────────────
   # Required. YardBird connects directly to the JMRI JSON WebSocket server.
   # Enable it in JMRI: Preferences → Web Server → JSON WebSocket.
   jmri:
     host: jmri.local          # JMRI server hostname or IP
     port: 12080               # JSON WebSocket port (JMRI default: 12080)
-    secure: false             # true → wss:// / https:// (for TLS / reverse-proxy setups)
+    secure: false             # true → wss:// (for TLS / reverse-proxy setups)
     mock: false               # true → simulated data, no hardware needed
 
-    # ── Tram / DC loop control ───────────────────────────────────────────────
-    # YardBird controls DC tram loops natively through JMRI.
-    # JMRI must already be connected to your DCC-EX command station
-    # (configure the DCC-EX connection in JMRI Preferences → Connections).
+    # ── Tram / DC loop control ─────────────────────────────────────────────
+    # YardBird controls DC tram loops natively through JMRI + DCC-EX.
+    # Add your DCC-EX command station in JMRI Preferences → Connections first.
     #
-    # tramPrefix: the system-connection prefix assigned to DCC-EX within JMRI.
-    # Omit this key entirely if your layout has only one system connection.
-    #
-    # To find your prefix: enable debug: true, connect, and open the browser
-    # console — or check JMRI Preferences → Connections for the letter prefix
-    # shown next to your DCC-EX connection (e.g. "D").
+    # tramPrefix: the system-connection prefix JMRI assigned to DCC-EX.
+    # Omit entirely if your layout has only one system connection.
+    # To find it: enable debug: true, connect, check the browser console —
+    # or look in JMRI Preferences → Connections (letter shown next to DCC-EX).
     tramPrefix: D
 
-    # DC PWM frequency applied to tram throttles on acquire (via F29/F30/F31).
-    # Requires DCC-EX firmware that supports these function-mapped PWM settings.
-    #   0 = 131 Hz  (DCC-EX default — audible hum)
+    # DC PWM frequency applied when a tram throttle is acquired (via F29/F30/F31).
+    #   0 = 131 Hz  (audible hum)
     #   1 = ~490 Hz
     #   2 = ~3.4 kHz
     #   3 = Supersonic  (recommended — silent DC operation)
     tramPwmFreq: 3
 
-    # ── Power zone buttons ───────────────────────────────────────────────────
-    # Determines what power-toggle buttons appear in the header toolbar.
+    # ── Command station power buttons ──────────────────────────────────────
+    # Controls the power toggle buttons shown in the header toolbar.
     # Three modes — choose one:
 
-    # Mode A — explicit zones (one button per entry):
-    #   Use prefix: ""  for the default / main JMRI connection.
-    #   Use the same prefix letter as tramPrefix for the DCC-EX connection.
-    powerZones:
-      - name: DCC
-        prefix: ""            # Default JMRI connection (main layout)
+    # Mode A — explicit stations (one button per entry):
+    commandStations:
+      - name: DCC             # Label shown on the button
+        prefix: "L"           # System connection prefix (must match JMRI)
       - name: Trams
-        prefix: D            # DCC-EX sub-connection (match tramPrefix above)
+        prefix: D             # Should match tramPrefix above
 
-    # Mode B — auto-discover connections reported by JMRI:
-    # powerZones:
+    # Mode B — auto-discover stations from JMRI:
+    # commandStations:
     #   discover: true
 
-    # Mode C — single combined power button (remove powerZones key entirely):
-    # (comment out or delete the powerZones block above)
+    # Mode C — single combined power button:
+    # (remove or comment out the commandStations key entirely)
 
-  # ── Home Assistant ────────────────────────────────────────────────────────
-  # Optional. Enables a tab for triggering HA scenes filtered by area.
-  # Get a Long-Lived Access Token from your HA Profile → Security page.
+  # ── Home Assistant ───────────────────────────────────────────────────────
+  # Optional. Enables HA entity widgets (lights, switches) filtered by area.
+  # Get a Long-Lived Access Token from HA Profile → Security.
   homeassistant:
     enabled: true
     url: http://homeassistant.local:8123
     token: ''                 # Paste your Long-Lived Access Token here
-    area: train_room          # HA area_id — only scenes in this area are shown
+    area: train_room          # HA area_id — only entities in this area appear
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-# Define which tabs appear and in what order.
-# Remove an entry to hide that tab entirely.
-#
-# id       must match a key in the tabComponents map in App.vue
-# name     displayed in the tab bar (rename freely)
-# icon     any Iconify icon name — browse at https://icon-sets.iconify.design/
-#          Material Design Icons (i-mdi-*) and Heroicons (i-heroicons-*) are bundled.
-tabs:
-  - id: throttles
-    name: Locomotives
-    icon: i-mdi-train
-
-  - id: turnouts
-    name: Turnouts
-    icon: i-mdi-source-branch
-
-  - id: lights
-    name: Lights
-    icon: i-mdi-lightbulb-outline
-
-  - id: trams                 # Remove if not using DC tram control
-    name: Trams
-    icon: i-mdi-tram
-
-  - id: room                  # Remove if Home Assistant is not configured
-    name: Room
-    icon: i-mdi-home
+# Dashboard tabs are created and arranged through the visual editor in the app.
+# Leave this empty for a fresh start — you'll be guided into edit mode on first run.
+# Export and import your full layout as a YAML file from within the editor.
+tabs: []

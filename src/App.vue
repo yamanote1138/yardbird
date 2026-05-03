@@ -18,28 +18,16 @@
   <div v-else class="min-h-screen bg-neutral-950 text-white">
     <!-- Sticky Header Section -->
     <div class="sticky top-0 z-[1000] bg-neutral-950 header-shadow">
-      <div class="px-4 md:px-6 py-2 sm:py-3 pb-2">
-        <!-- Header row -->
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <h1 class="text-lg md:text-xl font-semibold mb-1">{{ railroadName }}</h1>
-            <p class="text-neutral-400 text-sm md:text-base mb-2 sm:mb-3">{{ connectionSubtitle }}</p>
-          </div>
-          <!-- Edit mode toggle -->
-          <button
-            :title="editMode ? 'Exit edit mode' : 'Edit layout'"
-            class="flex-shrink-0 mt-0.5 p-1.5 rounded transition-colors"
-            :class="editMode
-              ? 'text-amber-400 bg-amber-400/10 hover:bg-amber-400/20'
-              : 'text-white/30 hover:text-white/60 hover:bg-white/5'"
-            @click="toggleEditMode"
-          >
-            <UIcon :name="editMode ? 'i-mdi-lock-open' : 'i-mdi-pencil'" class="w-5 h-5" />
-          </button>
-        </div>
+      <div class="px-4 md:px-6 py-2 sm:py-3 pb-2 flex items-center gap-3 md:gap-4">
+        <!-- YardBird icon -->
+        <img src="/favicon.svg" class="w-14 h-14 md:w-16 md:h-16 flex-shrink-0 opacity-80" alt="YardBird" />
 
-        <!-- Power Control with integrated status -->
-        <PowerControl @logout="handleExit" />
+        <!-- Railroad name + controls -->
+        <div class="flex-1 min-w-0">
+          <h1 class="text-lg md:text-xl font-semibold mb-1">{{ railroadName }}</h1>
+          <!-- Power Control with integrated status -->
+          <HeaderButtons @logout="handleExit" />
+        </div>
       </div>
 
       <!-- Tab Navigation -->
@@ -78,9 +66,21 @@
       <WidgetPalette />
 
       <div class="flex-1 overflow-auto px-4 md:px-6 pt-2 sm:pt-3 md:pt-4 min-w-0">
+        <!-- No tabs yet: first-run welcome -->
+        <div v-if="tabs.length === 0 && !editMode" class="flex flex-col items-center justify-center py-24 text-center px-4">
+          <img src="/favicon.svg" class="w-16 h-16 mb-6 opacity-40" alt="YardBird" />
+          <h2 class="text-white text-xl font-semibold mb-2">Welcome to YardBird</h2>
+          <p class="text-neutral-500 text-sm mb-8 max-w-sm">
+            Your dashboard is empty. Switch to edit mode to create tabs and drag widgets onto the canvas.
+          </p>
+          <UButton color="primary" size="lg" @click="toggleEditMode">
+            <template #leading><UIcon name="i-mdi-pencil" /></template>
+            Let's go
+          </UButton>
+        </div>
+
         <template v-for="tab in tabs" :key="tab.id">
           <div v-show="activeTab === tab.id">
-            <!-- Canvas mode: tab has widgets, or edit mode is active -->
             <TabCanvas
               v-if="tab.widgets.length > 0 || editMode"
               :ref="(el) => { if (el) canvasRefs[tab.id] = el as InstanceType<typeof TabCanvas> }"
@@ -88,11 +88,18 @@
               @configure="openWidgetConfig"
               @configure-new="openNewWidgetConfig"
             />
-            <!-- Legacy fallback: empty tab in run mode → existing list components -->
-            <component
-              v-else-if="tabComponents[tab.id]"
-              :is="tabComponents[tab.id]"
-            />
+            <!-- Empty tab in run mode: prompt to start editing -->
+            <div v-else class="flex flex-col items-center justify-center py-20 text-center">
+              <UIcon name="i-mdi-view-grid-plus-outline" class="w-14 h-14 text-neutral-700 mb-4" />
+              <h3 class="text-neutral-400 text-base font-medium mb-2">This tab has no widgets</h3>
+              <p class="text-neutral-600 text-sm mb-6 max-w-xs">
+                Switch to edit mode and drag widgets from the palette to build your dashboard.
+              </p>
+              <UButton color="primary" @click="toggleEditMode">
+                <template #leading><UIcon name="i-mdi-pencil" /></template>
+                Let's go
+              </UButton>
+            </div>
           </div>
         </template>
       </div>
@@ -101,34 +108,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, type Component } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
 import { useHomeAssistant } from '@/plugins/homeassistant'
 import { useConfig } from '@/core/useConfig'
 import { useEditMode } from '@/composables/useEditMode'
 import { setDebugMode } from '@/utils/logger'
 import { logger } from '@/utils/logger'
-import { version as appVersion } from '../package.json'
 import ConnectionSetup from '@/components/ConnectionSetup.vue'
-import PowerControl from '@/components/PowerControl.vue'
+import HeaderButtons from '@/components/HeaderButtons.vue'
 import TabCanvas from '@/components/TabCanvas.vue'
 import WidgetPalette from '@/widgets/WidgetPalette.vue'
 import WidgetConfigModal from '@/widgets/WidgetConfigModal.vue'
 import TabManager from '@/components/TabManager.vue'
-import ThrottleList from '@/plugins/jmri/components/ThrottleList.vue'
-import TurnoutList from '@/plugins/jmri/components/TurnoutList.vue'
-import LightList from '@/plugins/jmri/components/LightList.vue'
-import TramWidget from '@/plugins/jmri/components/TramWidget.vue'
-import SceneWidget from '@/plugins/homeassistant/components/SceneWidget.vue'
-
-// Legacy fallback components for tabs that have no widgets yet (empty migration)
-const tabComponents: Record<string, Component> = {
-  throttles: ThrottleList,
-  turnouts:  TurnoutList,
-  lights:    LightList,
-  trams:     TramWidget,
-  room:      SceneWidget,
-}
 
 import type { WidgetInstance } from '@/core/types'
 import { useWidgetConfig } from '@/composables/useWidgetConfig'
@@ -136,7 +128,7 @@ import { useWidgetConfig } from '@/composables/useWidgetConfig'
 const cfg = useConfig()
 const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
 const wc = useWidgetConfig()
-const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, jmriVersion } = useJmri()
+const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, applyCommandStationsConfig } = useJmri()
 const ha = useHomeAssistant()
 
 const isInitialized = ref(false)
@@ -188,19 +180,20 @@ watch(tabs, (newTabs) => {
 // Apply debug mode from config
 watch(cfg.debug, (enabled) => setDebugMode(enabled), { immediate: true })
 
-const connectionSubtitle = computed(() => {
-  const jmri = cfg.jmri.value
-  const parts = [
-    jmri?.mock ? 'mock data' : jmri ? `${jmri.host}:${jmri.port}` : '',
-    jmriVersion.value ? `JMRI ${jmriVersion.value}` : '',
-    `YardBird v${appVersion}`
-  ]
-  return parts.filter(Boolean).join(' | ')
-})
-
 watch(railroadName, (newName) => {
   document.title = newName
 }, { immediate: true })
+
+// Re-apply command stations when config changes while connected (e.g. after import)
+watch(
+  () => cfg.jmri.value?.commandStations,
+  async (newConfig) => {
+    if (isConnected.value) {
+      await applyCommandStationsConfig(newConfig)
+    }
+  },
+  { deep: true }
+)
 
 const handleConnect = async () => {
   const jmri = cfg.jmri.value
@@ -219,7 +212,7 @@ const handleConnect = async () => {
       mockEnabled: jmri.mock ?? false,
       mockDelay: 50,
       tramPrefix: jmri.tramPrefix,
-      powerZonesConfig: jmri.powerZones,
+      commandStationsConfig: jmri.commandStations,
     }
 
     let connectionTimeout: NodeJS.Timeout | null = null

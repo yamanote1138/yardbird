@@ -18,7 +18,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 22+** required
 
 ### Current Version
-v7.1.0 — Vite 8, TypeScript 6, @vitejs/plugin-vue 6
+v8.0.0 — Visual configurator release. Vite 8, TypeScript 6, @vitejs/plugin-vue 6
 
 ## User Context & Preferences
 
@@ -74,7 +74,7 @@ src/
 │   ├── ConnectionSetup.vue   — Splash screen + connection management (add/edit JMRI, HA)
 │   ├── TabCanvas.vue         — Gridstack-based grid canvas for a single tab's widgets
 │   ├── TabManager.vue        — Edit-mode tab bar (add/rename/reorder/delete tabs)
-│   └── PowerControl.vue      — Per-zone or single power button(s) + Stop All + Exit
+│   └── HeaderButtons.vue     — Header button row: power, stop all, edit mode, info, exit
 │
 ├── utils/
 │   └── logger.ts         — setDebugMode(bool) controls debug output; called from App.vue
@@ -319,19 +319,27 @@ Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
 
 ---
 
-## Visual Configurator — Implementation TODO
+## Visual Configurator — Complete (shipped in v8.0.0)
 
-Branch: `feat/visual-configurator`
+All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
-- [x] **Phase 1** — Config persistence layer: `src/core/types.ts` (add WidgetInstance/StoredConfig), `src/core/useConfig.ts` (new), update `App.vue`
-- [x] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts` (new), edit button in `App.vue` header
-- [x] **Phase 3** — Widget registry + WidgetFrame: `src/widgets/registry.ts` (new), `src/widgets/WidgetFrame.vue` (new), extract `TurnoutWidget.vue` and `LightWidget.vue`
-- [x] **Phase 4** — Gridstack canvas: install `gridstack`, `src/components/TabCanvas.vue` (new), replace tabComponents in `App.vue`
-- [x] **Phase 5** — Widget palette + drag-to-grid: `src/widgets/WidgetPalette.vue` (new), `GridStack.setupDragIn`, App layout sidebar
-- [x] **Phase 6** — Widget config modals: `src/composables/useWidgetConfig.ts` (new), `src/widgets/WidgetConfigModal.vue` + sub-forms
-- [x] **Phase 7** — Tab management: install `vue-draggable-plus`, `src/components/TabManager.vue` (new)
-- [x] **Phase 8** — Connection management UI: extend `ConnectionSetup.vue`
+- [x] **Phase 1** — Config persistence layer: `src/core/types.ts`, `src/core/useConfig.ts`, update `App.vue`
+- [x] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts`, edit button in header
+- [x] **Phase 3** — Widget registry + WidgetFrame: `src/widgets/registry.ts`, `src/widgets/WidgetFrame.vue`, `TurnoutWidget.vue`, `LightWidget.vue`
+- [x] **Phase 4** — Gridstack canvas: `src/components/TabCanvas.vue`, replaced tabComponents in `App.vue`
+- [x] **Phase 5** — Widget palette + drag-to-grid: `src/widgets/WidgetPalette.vue`, `GridStack.setupDragIn`
+- [x] **Phase 6** — Widget config modals: `src/composables/useWidgetConfig.ts`, `src/widgets/WidgetConfigModal.vue`, all sub-forms
+- [x] **Phase 7** — Tab management: `src/components/TabManager.vue`, import/export/reset
+- [x] **Phase 8** — Connection management UI: `ConnectionSetup.vue`
+
+### Drag-to-canvas: Key implementation notes
+
+- Widget type passes through drag via module-level `draggingWidgetType` in `src/widgets/dragState.ts` (not element attributes — the clone is a new DOM node)
+- Correct Gridstack event for external drag-ins is `dropped` `(event, prevNode, newNode)` — NOT `added` (which fires for `addWidget`/`makeWidget` only)
+- `setupDragIn` uses `{ flush: 'post' }` watch so palette DOM exists when it runs; `dragInSetup` flag resets on edit mode exit so it re-runs when palette remounts via `v-if`
+- **`acceptWidgets` must be `'.ybw-palette-item'`** — when set to `true`, Gridstack v12 internally hardcodes the selector as `.grid-stack-item` (`gridstack.js:2345`), which never matches our palette divs. Use the explicit class selector.
+- Grid has `minRow: 3` (240px min height); empty-state overlay uses `pointer-events-none` so it never blocks drops
 
 ---
 
-*Last updated: May 2026*
+*Last updated: May 2026 — v8.0.0*

@@ -48,7 +48,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDefinition> = {
 
   'jmri-power': {
     type: 'jmri-power',
-    name: 'Power Zone',
+    name: 'Command Station',
     icon: 'i-heroicons-bolt',
     plugin: 'jmri',
     defaultSize: { x: 0, y: 0, w: 2, h: 1 },
@@ -57,18 +57,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetDefinition> = {
     component: () => import('@/plugins/jmri/components/PowerWidget.vue'),
   },
 
-  'jmri-tram': {
-    type: 'jmri-tram',
-    name: 'Trams',
-    icon: 'i-mdi-tram',
-    plugin: 'jmri',
-    defaultSize: { x: 0, y: 0, w: 6, h: 6 },
-    minSize: { w: 4, h: 5 },
-    hasConfig: false,
-    component: () => import('@/plugins/jmri/components/TramWidget.vue'),
-  },
-
-  'ha-entity': {
+'ha-entity': {
     type: 'ha-entity',
     name: 'Room Control',
     icon: 'i-mdi-home',

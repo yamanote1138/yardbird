@@ -17,15 +17,15 @@ plugins:
 
     # Power zone buttons shown in the header toolbar.
     # Option 1 — explicit zones (prefix "" = default JMRI connection):
-    powerZones:
+    commandStations:
       - name: DCC
         prefix: "L"
       - name: Trams
         prefix: D
     # Option 2 — auto-discover from JMRI system connections:
-    # powerZones:
+    # commandStations:
     #   discover: true
-    # Option 3 — single combined power button (omit powerZones entirely)
+    # Option 3 — single combined power button (omit commandStations entirely)
 
   # Uncomment and configure to enable Home Assistant scene control
   homeassistant:
@@ -35,23 +35,4 @@ plugins:
     # HA area_id to filter entities
     area: train_room
 
-tabs:
-  - id: throttles
-    name: Locomotives
-    icon: i-mdi-train
-
-  - id: turnouts
-    name: Turnouts
-    icon: i-mdi-source-branch
-
-  - id: lights
-    name: Lights
-    icon: i-mdi-lightbulb-outline
-
-  - id: trams
-    name: Trams
-    icon: i-mdi-tram
-
-  - id: room
-    name: Room
-    icon: i-mdi-home
+tabs: []

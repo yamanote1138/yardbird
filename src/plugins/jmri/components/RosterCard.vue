@@ -27,21 +27,28 @@ import LocomotiveHeader from './LocomotiveHeader.vue'
 
 const props = defineProps<{
   entry: RosterEntry
+  commandStation?: string
 }>()
 
-const { isConnected, power, acquireThrottle } = useJmri()
+const { isConnected, power, powerByPrefix, acquireThrottle } = useJmri()
 
 const isAcquiring = ref(false)
 
-// Disable acquire button when not connected or power is off
-const acquireDisabled = computed(() => {
-  return !isConnected.value || power.value !== PowerState.ON || isAcquiring.value
+const stationPower = computed(() => {
+  if (props.commandStation !== undefined) {
+    return powerByPrefix.value.get(props.commandStation) ?? PowerState.UNKNOWN
+  }
+  return power.value
 })
+
+const acquireDisabled = computed(() =>
+  !isConnected.value || stationPower.value !== PowerState.ON || isAcquiring.value
+)
 
 async function onAcquire() {
   isAcquiring.value = true
   try {
-    await acquireThrottle(props.entry.address)
+    await acquireThrottle(props.entry.address, props.commandStation)
   } finally {
     isAcquiring.value = false
   }
