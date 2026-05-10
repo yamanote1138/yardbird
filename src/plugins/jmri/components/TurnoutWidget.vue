@@ -2,6 +2,7 @@
   <div class="p-2">
     <UButton
       v-if="turnout"
+      block
       size="md"
       :color="buttonColor"
       :loading="changing"
@@ -11,7 +12,7 @@
       <template #leading>
         <UIcon v-if="!changing" :name="icon" />
       </template>
-      {{ turnout.userName || turnout.name }}
+      <span class="truncate min-w-0 text-xs @[120px]:text-sm">{{ turnout.userName || turnout.name }}</span>
     </UButton>
     <p v-else class="text-neutral-500 text-sm">Turnout not found: {{ name }}</p>
   </div>

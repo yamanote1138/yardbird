@@ -235,6 +235,22 @@ export function useHomeAssistant() {
     connectWs(url, token, areaId)
   }
 
+  function connectMock(): void {
+    disconnect()
+    const mockEntities: HaEntity[] = [
+      { entityId: 'light.layout_lighting',      domain: 'light',  friendlyName: 'Layout Lighting',      state: 'on' },
+      { entityId: 'light.train_room_overhead',  domain: 'light',  friendlyName: 'Train Room Overhead',  state: 'off' },
+      { entityId: 'light.workbench',            domain: 'light',  friendlyName: 'Workbench',             state: 'off' },
+      { entityId: 'switch.layout_power_strip',  domain: 'switch', friendlyName: 'Layout Power Strip',   state: 'on' },
+      { entityId: 'switch.camera',              domain: 'switch', friendlyName: 'Camera',                state: 'off' },
+    ]
+    const map = new Map<string, HaEntity>()
+    for (const e of mockEntities) map.set(e.entityId, e)
+    entities.value = map
+    connectionState.value = 'connected'
+    logger.info('[HA] Mock mode — seeded', mockEntities.length, 'entities')
+  }
+
   function disconnect(): void {
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
@@ -292,6 +308,7 @@ export function useHomeAssistant() {
         .sort((a, b) => a.friendlyName.localeCompare(b.friendlyName))
     ),
     connect,
+    connectMock,
     disconnect,
     toggleEntity,
     setBrightness,

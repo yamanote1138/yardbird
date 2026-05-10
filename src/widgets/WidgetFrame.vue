@@ -31,7 +31,7 @@
     </div>
 
     <!-- Widget content -->
-    <div class="h-full overflow-auto" :class="editMode ? 'pt-7' : ''">
+    <div class="h-full overflow-auto @container" :class="editMode ? 'pt-7' : ''">
       <Suspense>
         <component
           :is="resolvedComponent"

@@ -1,9 +1,9 @@
 <template>
-  <!-- Config loading -->
-  <div v-if="configLoading" class="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
+  <!-- Config loading or auto-reconnect in progress -->
+  <div v-if="configLoading || isAutoConnecting" class="min-h-screen bg-neutral-950 text-white flex items-center justify-center">
     <div class="text-center">
       <img src="/favicon.svg" class="w-16 h-16 mx-auto mb-4 opacity-60" alt="YardBird" />
-      <p class="text-neutral-400 text-sm">Loading config...</p>
+      <p class="text-neutral-400 text-sm">{{ isAutoConnecting ? 'Reconnecting...' : 'Loading config...' }}</p>
     </div>
   </div>
 
@@ -61,6 +61,9 @@
     <!-- Widget config modal (global, rendered once) -->
     <WidgetConfigModal />
 
+    <!-- Toast notifications -->
+    <UToaster />
+
     <!-- Content area: palette sidebar + tab canvas -->
     <div class="flex min-h-0 overflow-hidden">
       <WidgetPalette />
@@ -108,7 +111,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
 import { useHomeAssistant } from '@/plugins/homeassistant'
 import { useConfig } from '@/core/useConfig'
@@ -131,7 +135,20 @@ const wc = useWidgetConfig()
 const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, applyCommandStationsConfig } = useJmri()
 const ha = useHomeAssistant()
 
+const route = useRoute()
+const router = useRouter()
+
+function tabIdFromRoute(): string {
+  const m = route.params.pathMatch
+  const segments = Array.isArray(m) ? m : (m ? [m] : [])
+  if (segments[0]) return decodeURIComponent(segments[0])
+  // Router may not have resolved the initial navigation yet — fall back to the live hash
+  const match = window.location.hash.match(/^#?\/?([^/?#]+)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}
+
 const isInitialized = ref(false)
+const isAutoConnecting = ref(false)
 const activeTab = ref('')
 const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 
@@ -170,12 +187,31 @@ function openNewWidgetConfig(widget: WidgetInstance) {
 const configLoading = computed(() => cfg.loading.value)
 const tabs = computed(() => cfg.tabs.value)
 
-// Set first tab as active once config loads
+// Set active tab once config loads — prefer URL hash, fall back to first tab
 watch(tabs, (newTabs) => {
-  if (newTabs.length && !activeTab.value) {
+  if (!newTabs.length) return
+  const fromUrl = tabIdFromRoute()
+  if (fromUrl && newTabs.find(t => t.id === fromUrl)) {
+    activeTab.value = fromUrl
+  } else if (!activeTab.value || !newTabs.find(t => t.id === activeTab.value)) {
     activeTab.value = newTabs[0].id
   }
 }, { immediate: true })
+
+// Sync activeTab → URL
+watch(activeTab, (id) => {
+  if (!id) return
+  if (tabIdFromRoute() === id) return
+  router.replace({ path: `/${encodeURIComponent(id)}` })
+})
+
+// Sync URL → activeTab (browser back/forward, manual edits)
+watch(() => tabIdFromRoute(), (id) => {
+  if (!id || id === activeTab.value) return
+  if (tabs.value.find(t => t.id === id)) {
+    activeTab.value = id
+  }
+})
 
 // Apply debug mode from config
 watch(cfg.debug, (enabled) => setDebugMode(enabled), { immediate: true })
@@ -218,10 +254,16 @@ const handleConnect = async () => {
     let connectionTimeout: NodeJS.Timeout | null = null
     let hasHandledError = false
 
-    const handleConnectionError = (message: string) => {
+    const handleConnectionError = async (message: string) => {
       if (hasHandledError) return
       hasHandledError = true
       if (connectionTimeout) clearTimeout(connectionTimeout)
+      if (isAutoConnecting.value) {
+        // Auto-reconnect failed — surface ConnectionSetup so the user can retry
+        isAutoConnecting.value = false
+        localStorage.removeItem('yardbird:connected')
+        await nextTick()
+      }
       setupRef.value?.setError(message)
       disconnect()
     }
@@ -255,13 +297,20 @@ const handleConnect = async () => {
         }
 
         const haCfg = cfg.homeassistant.value
-        if (haCfg?.enabled && haCfg.url && haCfg.token && haCfg.area) {
-          const haWsUrl = haCfg.url.replace(/^http/, 'ws').replace(/\/?$/, '/api/websocket')
-          logger.info('Connecting to Home Assistant at', haWsUrl)
-          ha.connect(haWsUrl, haCfg.token, haCfg.area)
+        if (haCfg?.enabled) {
+          if (haCfg.mock) {
+            logger.info('Home Assistant mock mode enabled')
+            ha.connectMock()
+          } else if (haCfg.url && haCfg.token && haCfg.area) {
+            const haWsUrl = haCfg.url.replace(/^http/, 'ws').replace(/\/?$/, '/api/websocket')
+            logger.info('Connecting to Home Assistant at', haWsUrl)
+            ha.connect(haWsUrl, haCfg.token, haCfg.area)
+          }
         }
 
         isInitialized.value = true
+        isAutoConnecting.value = false
+        localStorage.setItem('yardbird:connected', '1')
       } else if (
         (newState === ConnectionState.DISCONNECTED || newState === ConnectionState.UNKNOWN) &&
         !isInitialized.value &&
@@ -286,12 +335,23 @@ const handleConnect = async () => {
 
 const handleExit = () => {
   logger.info('Exiting to welcome screen')
+  localStorage.removeItem('yardbird:connected')
   exitEditMode()
   ha.disconnect()
   disconnect()
   isInitialized.value = false
   document.title = 'YardBird'
 }
+
+// Auto-reconnect on reload if we were previously connected
+watch(configLoading, (loading) => {
+  if (loading || isInitialized.value) return
+  if (cfg.jmri.value && localStorage.getItem('yardbird:connected') === '1') {
+    logger.info('Auto-reconnecting from previous session')
+    isAutoConnecting.value = true
+    handleConnect()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>

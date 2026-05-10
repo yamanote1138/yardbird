@@ -23,6 +23,7 @@ export interface JmriPluginConfig {
 
 export interface HomeAssistantPluginConfig {
   enabled?: boolean
+  mock?: boolean
   url: string
   token: string
   area: string

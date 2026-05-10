@@ -1,6 +1,7 @@
 <template>
   <div class="p-2">
     <UButton
+      block
       :color="buttonColor"
       :disabled="!isConnected || busy"
       @click="handleToggle"
@@ -8,7 +9,7 @@
       <template #leading>
         <UIcon :name="buttonIcon" />
       </template>
-      {{ label || 'Power' }}
+      <span class="truncate min-w-0 text-xs @[120px]:text-sm">{{ label || 'Power' }}</span>
     </UButton>
   </div>
 </template>

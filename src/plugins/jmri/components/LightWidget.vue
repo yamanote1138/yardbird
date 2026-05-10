@@ -2,6 +2,7 @@
   <div class="p-2">
     <UButton
       v-if="light"
+      block
       size="md"
       :color="buttonColor"
       :loading="changing"
@@ -11,7 +12,7 @@
       <template #leading>
         <UIcon v-if="!changing" :name="icon" />
       </template>
-      {{ light.userName || light.name }}
+      <span class="truncate min-w-0 text-xs @[120px]:text-sm">{{ light.userName || light.name }}</span>
     </UButton>
     <p v-else class="text-neutral-500 text-sm">Light not found: {{ name }}</p>
   </div>

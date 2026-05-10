@@ -4,7 +4,7 @@
     <!-- Empty state overlay (pointer-events-none so the grid receives drops) -->
     <div
       v-if="editMode && renderedWidgets.length === 0"
-      class="absolute inset-0 flex items-center justify-center border-2 border-dashed border-white/10 rounded-lg text-neutral-500 text-sm pointer-events-none z-10"
+      class="absolute inset-0 flex items-center justify-center border-2 border-dashed border-success-400/50 rounded-lg text-success-400/80 text-sm pointer-events-none z-10"
     >
       Drag widgets from the palette to add them here
     </div>
@@ -40,6 +40,7 @@
 import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { GridStack } from 'gridstack'
 import type { GridStackNode } from 'gridstack'
+import { useToast } from '@nuxt/ui/composables/useToast'
 import { useEditMode } from '@/composables/useEditMode'
 import { useConfig } from '@/core/useConfig'
 import { getWidgetDef } from '@/widgets/registry'
@@ -155,6 +156,24 @@ watch(
   },
 )
 
+// When an existing widget's config is edited (via the config modal), reflect the
+// new config in renderedWidgets without touching grid positions (Gridstack owns those).
+watch(
+  () => props.tab.widgets,
+  (fresh) => {
+    let changed = false
+    const updated = renderedWidgets.value.map(w => {
+      const newW = fresh.find(n => n.id === w.id)
+      if (newW && newW.config !== w.config) {
+        changed = true
+        return { ...w, config: newW.config }
+      }
+      return w
+    })
+    if (changed) renderedWidgets.value = updated
+  },
+)
+
 // ── Position sync ─────────────────────────────────────────────────────────────
 
 function syncPositions(nodes: GridStackNode[]) {
@@ -174,12 +193,15 @@ function syncPositions(nodes: GridStackNode[]) {
 
 // ── Palette drop ──────────────────────────────────────────────────────────────
 
+const toast = useToast()
+
 function handlePaletteDrop(node: GridStackNode) {
   const widgetType = draggingWidgetType as WidgetType | null
   setDraggingType(null)
 
   if (!widgetType) {
     if (node.el) grid?.removeWidget(node.el, true)
+    toast.add({ title: 'Drop failed', description: 'Could not identify widget type. Try again.', color: 'error' })
     return
   }
 
@@ -235,5 +257,24 @@ function handleRemove(widgetId: string) {
   cfg.saveTabs(tabs)
 }
 
-defineExpose({ commitWidget })
+function addWidgetOfType(type: WidgetType) {
+  const def = getWidgetDef(type)
+  const maxY = renderedWidgets.value.reduce((acc, w) => {
+    const pos = initialPos.value[w.id]
+    return Math.max(acc, (pos?.y ?? 0) + (pos?.h ?? 1))
+  }, 0)
+  const newWidget: WidgetInstance = {
+    id: crypto.randomUUID(),
+    type,
+    grid: { x: 0, y: maxY, w: def.defaultSize.w, h: def.defaultSize.h },
+    config: {},
+  }
+  if (def.hasConfig) {
+    emit('configure-new', newWidget)
+  } else {
+    commitWidget(newWidget)
+  }
+}
+
+defineExpose({ commitWidget, addWidgetOfType })
 </script>

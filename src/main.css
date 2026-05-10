@@ -14,3 +14,10 @@
   --ui-color-success-900: #1f2809;
   --ui-color-success-950: #111505;
 }
+
+/* Gridstack drop indicator — use YardBird green so the drop target is obvious while dragging */
+.grid-stack > .grid-stack-placeholder > .placeholder-content {
+  background-color: color-mix(in srgb, var(--ui-color-success-400) 15%, transparent);
+  border: 2px dashed var(--ui-color-success-400);
+  border-radius: 0.5rem;
+}

@@ -2,6 +2,7 @@
   <div class="p-2">
     <UButton
       v-if="entity"
+      block
       size="md"
       :color="buttonColor"
       :disabled="!ha.isConnected.value"
@@ -10,7 +11,7 @@
       <template #leading>
         <UIcon :name="icon" />
       </template>
-      {{ entity.friendlyName }}
+      <span class="truncate min-w-0 text-xs @[120px]:text-sm">{{ entity.friendlyName }}</span>
     </UButton>
     <p v-else class="text-neutral-500 text-sm">Entity not found: {{ entityId }}</p>
   </div>
