@@ -13,7 +13,6 @@ declare module 'vue' {
   export interface GlobalComponents {
     ConnectionSetup: typeof import('./src/components/ConnectionSetup.vue')['default']
     HeaderButtons: typeof import('./src/components/HeaderButtons.vue')['default']
-    PowerControl: typeof import('./src/components/PowerControl.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     TabCanvas: typeof import('./src/components/TabCanvas.vue')['default']

@@ -30,6 +30,19 @@ export interface JmriConnectionSettings {
 // Tram DCC addresses — these are filtered out of the main locomotive roster
 export const TRAM_ADDRESSES = [30, 31] as const
 
+// Background-tab brake watchdog. JMRI's idle-kill is 30s; the heartbeat is 15s,
+// so worst case the last beat fired at t=-14s leaving ~16s before JMRI cuts us.
+// 12s leaves ~3-4s for the brake itself (1.5s ramp + per-throttle release).
+const HIDDEN_BRAKE_WATCHDOG_MS = 12000
+const BRAKE_RAMP_MS = 1500
+const BRAKE_STEP_MS = 100
+
+// Event surface for the UI to subscribe to (toast notifications).
+export interface JmriEvent {
+  kind: 'preemptive-release' | 'unexpected-disconnect-released'
+  names: string[]
+}
+
 // Singleton state
 const jmriState = ref<JmriState>({
   power: 0, // PowerState.UNKNOWN
@@ -43,13 +56,28 @@ const connectionState = ref<ConnectionState>(ConnectionState.DISCONNECTED)
 const isServerOnline = ref<boolean>(true) // Browser/web server connectivity
 const railroadName = ref<string>('Model Railroad')
 const jmriVersion = ref<string>('')
+const lastEvent = ref<JmriEvent | null>(null)
 let jmriClient: JmriClient | null = null
 let currentSettings: JmriConnectionSettings | null = null
 const throttleIds = new Map<number, string>() // address -> throttleId mapping
 
+// Listener refs + watchdog state so we can clean them up on disconnect.
+let onVisibilityChange: (() => void) | null = null
+let onBrowserOnline: (() => void) | null = null
+let onBrowserOffline: (() => void) | null = null
+let hiddenWatchdogId: ReturnType<typeof setTimeout> | null = null
+let preemptiveReleaseInFlight = false
+let preemptiveReleaseLastNames: string[] = []
+
 // Command station state — populated on connect based on commandStationsConfig
 const commandStations = ref<CommandStation[]>([])
 const powerByPrefix = ref<Map<string, PowerState>>(new Map())
+
+function emitJmriEvent(ev: JmriEvent) {
+  // Reassign to a fresh object so Vue watchers see the change even if names happen
+  // to match a prior event.
+  lastEvent.value = { kind: ev.kind, names: [...ev.names] }
+}
 
 async function resolveCommandStations(config: CommandStationsConfig | undefined): Promise<CommandStation[]> {
   if (!config) return []
@@ -182,6 +210,27 @@ export function useJmri() {
     jmriClient.on('disconnected', (reason: any) => {
       logger.warn('JMRI client disconnected:', reason)
       connectionState.value = ConnectionState.UNKNOWN
+
+      // Capture acquired throttle names before clearing so we can toast them.
+      // JMRI has already released them server-side; their throttle IDs are dead.
+      const releasedNames = Array.from(jmriState.value.throttles.values()).map(t => t.name)
+      throttleIds.clear()
+      jmriState.value.throttles.clear()
+
+      if (releasedNames.length === 0) return
+
+      // If the preemptive (visibility-driven) release just handled exactly
+      // these throttles, suppress the duplicate "unexpected disconnect" toast.
+      const handledByVisibility =
+        preemptiveReleaseLastNames.length > 0 &&
+        releasedNames.every(n => preemptiveReleaseLastNames.includes(n))
+
+      if (handledByVisibility) {
+        preemptiveReleaseLastNames = []
+        return
+      }
+
+      emitJmriEvent({ kind: 'unexpected-disconnect-released', names: releasedNames })
     })
 
     jmriClient.on('reconnecting', (attempt: number, delay: number) => {
@@ -317,20 +366,47 @@ export function useJmri() {
 
     // Listen for browser-level connectivity changes
     // This detects when the web server (Vite/production) goes down
-    window.addEventListener('offline', () => {
+    onBrowserOffline = () => {
       logger.warn('Browser detected offline - web server may be down')
       isServerOnline.value = false
-    })
-
-    window.addEventListener('online', () => {
+    }
+    onBrowserOnline = () => {
       logger.info('Browser detected back online')
       isServerOnline.value = true
-    })
+    }
+    window.addEventListener('offline', onBrowserOffline)
+    window.addEventListener('online', onBrowserOnline)
 
     // Check initial browser connectivity state
     if (!navigator.onLine) {
       logger.warn('Browser is offline at initialization')
       isServerOnline.value = false
+    }
+
+    // Background-tab brake. When the tab is hidden, the browser throttles JS
+    // timers, the jmri-client heartbeat eventually misses, and JMRI cuts the
+    // socket — hard-releasing all throttles. To preempt that, schedule a
+    // watchdog when the tab hides; if still hidden when it fires, gracefully
+    // brake and release all throttles while we still have a live socket.
+    // Skipped in mock mode (no real JMRI to time out).
+    if (!settings.mockEnabled) {
+      onVisibilityChange = () => {
+        if (document.hidden) {
+          if (hiddenWatchdogId !== null) return
+          if (connectionState.value !== ConnectionState.CONNECTED) return
+          logger.info(`Tab hidden — scheduling preemptive brake in ${HIDDEN_BRAKE_WATCHDOG_MS}ms`)
+          hiddenWatchdogId = setTimeout(handleHiddenWatchdogFire, HIDDEN_BRAKE_WATCHDOG_MS)
+        } else {
+          if (hiddenWatchdogId !== null) {
+            clearTimeout(hiddenWatchdogId)
+            hiddenWatchdogId = null
+            logger.debug('Tab visible again — preemptive brake cancelled')
+          }
+          // If a brake is mid-flight, let it finish; aborting would leave
+          // throttles in an intermediate state.
+        }
+      }
+      document.addEventListener('visibilitychange', onVisibilityChange)
     }
 
     // In development, listen to Vite's HMR connection state
@@ -808,36 +884,105 @@ export function useJmri() {
   }
 
   /**
-   * Release a throttle
+   * Ramp a throttle linearly from its current speed to 0, then release it.
+   * If speed is already 0, releases immediately. Tolerant of errors mid-brake —
+   * always proceeds to release the handle and clear local state. Never throws.
+   * Returns the throttle's name and starting speed for caller toast composition,
+   * or null if no such throttle was acquired.
    */
-  async function releaseThrottle(address: number) {
+  async function brakeAndRelease(
+    address: number
+  ): Promise<{ name: string; brakedFrom: number } | null> {
+    const throttleId = throttleIds.get(address)
+    const throttle = jmriState.value.throttles.get(address)
+    if (!throttleId || !throttle) return null
+
+    const startSpeed = throttle.speed
+    const name = throttle.name
+
+    // Connection already gone: just clean up local state, no remote calls.
     if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
-      logger.error('Cannot release throttle: JMRI client not connected')
-      return
+      logger.debug(`brakeAndRelease(${name}): connection already gone, cleaning local state only`)
+      throttleIds.delete(address)
+      jmriState.value.throttles.delete(address)
+      return { name, brakedFrom: startSpeed }
     }
 
-    const throttleId = throttleIds.get(address)
-    if (!throttleId) {
+    if (startSpeed > 0.01) {
+      const steps = Math.max(1, Math.ceil(BRAKE_RAMP_MS / BRAKE_STEP_MS))
+      logger.info(`Braking ${name} from ${Math.round(startSpeed * 100)}% to 0 over ${BRAKE_RAMP_MS}ms`)
+      for (let i = 1; i <= steps; i++) {
+        if (connectionState.value !== ConnectionState.CONNECTED) break
+        const t = i / steps
+        const speed = Math.max(0, startSpeed * (1 - t))
+        try {
+          await jmriClient.setThrottleSpeed(throttleId, speed)
+        } catch (err) {
+          logger.warn(`brakeAndRelease: setThrottleSpeed failed mid-brake for ${name}:`, err)
+          break
+        }
+        if (i < steps) await new Promise(r => setTimeout(r, BRAKE_STEP_MS))
+      }
+    }
+
+    try {
+      if (jmriClient && connectionState.value === ConnectionState.CONNECTED) {
+        await jmriClient.setThrottleSpeed(throttleId, 0)
+        logger.info(`Releasing throttle for ${name}`)
+        await jmriClient.releaseThrottle(throttleId)
+      }
+    } catch (err) {
+      logger.warn(`brakeAndRelease: release failed for ${name} (socket likely gone):`, err)
+    } finally {
+      throttleIds.delete(address)
+      jmriState.value.throttles.delete(address)
+    }
+
+    return { name, brakedFrom: startSpeed }
+  }
+
+  /**
+   * Release a throttle. Delegates to brakeAndRelease so locomotives at speed
+   * decelerate gracefully rather than slamming to 0.
+   */
+  async function releaseThrottle(address: number) {
+    if (!throttleIds.has(address)) {
       logger.error(`No throttle acquired for address ${address}`)
       return
     }
+    await brakeAndRelease(address)
+  }
 
-    const throttle = jmriState.value.throttles.get(address)
-    const name = throttle?.name || `Address ${address}`
+  /**
+   * Watchdog fire: tab has been hidden long enough that JMRI's idle timeout is
+   * imminent. Brake and release all acquired throttles while we still have a
+   * live socket, then emit a preemptive-release event for the UI to toast.
+   */
+  async function handleHiddenWatchdogFire() {
+    hiddenWatchdogId = null
+    if (!document.hidden) return
+    if (connectionState.value !== ConnectionState.CONNECTED) return
+    if (preemptiveReleaseInFlight) return
+    if (jmriState.value.throttles.size === 0) return
 
+    preemptiveReleaseInFlight = true
     try {
-      // Stop the throttle first
-      logger.debug(`Stopping throttle ${name} before release`)
-      await jmriClient.setThrottleSpeed(throttleId, 0)
+      const snapshot = Array.from(jmriState.value.throttles.values()).map(t => ({
+        address: t.address,
+        name: t.name,
+      }))
+      preemptiveReleaseLastNames = snapshot.map(s => s.name)
+      logger.info(`Preemptive brake firing for ${snapshot.length} throttle(s): ${preemptiveReleaseLastNames.join(', ')}`)
 
-      // Release the throttle
-      logger.info(`Releasing throttle for ${name}`)
-      await jmriClient.releaseThrottle(throttleId)
-      throttleIds.delete(address)
-      jmriState.value.throttles.delete(address)
-    } catch (error) {
-      logger.error(`Failed to release throttle for address ${address}:`, error)
-      throw error
+      // Sequential, not parallel — JMRI processes one message at a time and we
+      // want predictable, observable braking.
+      for (const { address } of snapshot) {
+        await brakeAndRelease(address)
+      }
+
+      emitJmriEvent({ kind: 'preemptive-release', names: preemptiveReleaseLastNames })
+    } finally {
+      preemptiveReleaseInFlight = false
     }
   }
 
@@ -918,6 +1063,26 @@ export function useJmri() {
       logger.error('Error during disconnect:', error)
     }
 
+    // Remove DOM listeners so they don't leak across reconnect cycles.
+    if (onVisibilityChange) {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      onVisibilityChange = null
+    }
+    if (onBrowserOnline) {
+      window.removeEventListener('online', onBrowserOnline)
+      onBrowserOnline = null
+    }
+    if (onBrowserOffline) {
+      window.removeEventListener('offline', onBrowserOffline)
+      onBrowserOffline = null
+    }
+    if (hiddenWatchdogId !== null) {
+      clearTimeout(hiddenWatchdogId)
+      hiddenWatchdogId = null
+    }
+    preemptiveReleaseInFlight = false
+    preemptiveReleaseLastNames = []
+
     jmriClient = null
     currentSettings = null
     connectionState.value = ConnectionState.DISCONNECTED
@@ -942,6 +1107,7 @@ export function useJmri() {
     jmriVersion,
     commandStations,
     powerByPrefix,
+    lastEvent,
 
     // Computed
     isConnected: computed(() => connectionState.value === ConnectionState.CONNECTED),

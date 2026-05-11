@@ -113,6 +113,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '@nuxt/ui/composables/useToast'
 import { useJmri, type JmriConnectionSettings, ConnectionState } from '@/plugins/jmri'
 import { useHomeAssistant } from '@/plugins/homeassistant'
 import { useConfig } from '@/core/useConfig'
@@ -132,8 +133,33 @@ import { useWidgetConfig } from '@/composables/useWidgetConfig'
 const cfg = useConfig()
 const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
 const wc = useWidgetConfig()
-const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, applyCommandStationsConfig } = useJmri()
+const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, applyCommandStationsConfig, lastEvent: jmriLastEvent } = useJmri()
 const ha = useHomeAssistant()
+const toast = useToast()
+
+watch(jmriLastEvent, (ev) => {
+  if (!ev) return
+  const count = ev.names.length
+  const noun = count === 1 ? 'throttle' : 'throttles'
+  const names = ev.names.join(', ')
+  if (ev.kind === 'preemptive-release') {
+    toast.add({
+      title: 'Tab was hidden — throttles released',
+      description: `To prevent a JMRI timeout, gracefully stopped and released ${count} ${noun}: ${names}.`,
+      color: 'warning',
+      icon: 'i-mdi-eye-off',
+      duration: 8000,
+    })
+  } else if (ev.kind === 'unexpected-disconnect-released') {
+    toast.add({
+      title: 'Connection lost',
+      description: `JMRI released ${count} ${noun}: ${names}. Reconnect when ready.`,
+      color: 'error',
+      icon: 'i-mdi-lan-disconnect',
+      duration: 10000,
+    })
+  }
+})
 
 const route = useRoute()
 const router = useRouter()
