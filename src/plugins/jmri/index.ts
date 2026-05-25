@@ -634,13 +634,26 @@ export function useJmri() {
       const httpProtocol = currentSettings?.protocol === 'wss' ? 'https' : 'http'
       const { host, port, mockEnabled } = currentSettings ?? { host: '', port: 0, mockEnabled: false }
 
-      for (const group of allGroups) {
+      // "All Entries" is JMRI's built-in catch-all — skip it, we have our own "All" pill
+      const namedGroups = allGroups.filter((g: { name: string }) => g.name !== 'All Entries')
+      for (const group of namedGroups) {
+        groupedRosterEntries.value.set(group.name, [])
+      }
+
+      // JMRI's WebSocket API may return all entries regardless of the group param.
+      // Fetch per group but deduplicate by address; use each entry's own rosterGroups
+      // field as ground truth for group membership.
+      const seenAddresses = new Set<number>()
+
+      for (const group of namedGroups) {
         const entries = await jmriClient.getRosterEntriesByGroup(group.name)
-        const parsedEntries: RosterEntry[] = []
 
         for (const entry of entries) {
           const entryData = entry.data
           const address = parseInt(entryData.address)
+          if (seenAddresses.has(address)) continue
+          seenAddresses.add(address)
+
           let thumbnailUrl: string | undefined
           if (mockEnabled) {
             thumbnailUrl = `/locomotives/${entryData.name}.png`
@@ -668,12 +681,15 @@ export function useJmri() {
             functionKeys,
           }
           jmriState.value.roster.set(address, rosterEntry)
-          parsedEntries.push(rosterEntry)
-        }
 
-        groupedRosterEntries.value.set(group.name, parsedEntries)
+          // Assign to groups using the entry's own rosterGroups array
+          const entryGroupNames: string[] = Array.isArray(entryData.rosterGroups) ? entryData.rosterGroups : []
+          for (const groupName of entryGroupNames) {
+            groupedRosterEntries.value.get(groupName)?.push(rosterEntry)
+          }
+        }
       }
-      logger.info(`Loaded ${allGroups.length} roster group(s) from JMRI`)
+      logger.info(`Loaded ${namedGroups.length} roster group(s) from JMRI`)
     } catch (error) {
       logger.error('Failed to fetch roster groups:', error)
       throw error
