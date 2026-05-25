@@ -133,7 +133,7 @@ import { useWidgetConfig } from '@/composables/useWidgetConfig'
 const cfg = useConfig()
 const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
 const wc = useWidgetConfig()
-const { initialize, disconnect, fetchRoster, isConnected, connectionState, railroadName, applyCommandStationsConfig, lastEvent: jmriLastEvent } = useJmri()
+const { initialize, disconnect, fetchRoster, fetchRosterGroups, isConnected, connectionState, railroadName, applyCommandStationsConfig, lastEvent: jmriLastEvent } = useJmri()
 const ha = useHomeAssistant()
 const toast = useToast()
 
@@ -273,7 +273,7 @@ const handleConnect = async () => {
       protocol: jmri.secure ? 'wss' : 'ws',
       mockEnabled: jmri.mock ?? false,
       mockDelay: 50,
-      tramPrefix: jmri.tramPrefix,
+      rosterGroups: jmri.rosterGroups,
       commandStationsConfig: jmri.commandStations,
     }
 
@@ -320,6 +320,12 @@ const handleConnect = async () => {
           await fetchRoster()
         } catch (error) {
           logger.error('Failed to fetch roster:', error)
+        }
+
+        try {
+          await fetchRosterGroups()
+        } catch (error) {
+          logger.error('Failed to fetch roster groups:', error)
         }
 
         const haCfg = cfg.homeassistant.value

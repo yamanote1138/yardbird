@@ -10,10 +10,15 @@ plugins:
     secure: false
     # Set to true to use simulated data (no JMRI hardware required)
     mock: true
-    tramPrefix: D
     tramPwmFreq: 3
     # DC PWM frequency applied on acquire via F29/F30/F31:
     # 0=131Hz (default), 1=490Hz (F29), 2=3.4kHz (F30), 3=Supersonic (F31)
+
+    # Roster groups: name must match a JMRI roster group exactly.
+    # commandStation routes per-zone power control to the right connection.
+    rosterGroups:
+      - name: Trams
+        commandStation: D
 
     # Power zone buttons shown in the header toolbar.
     # Option 1 — explicit zones (prefix "" = default JMRI connection):

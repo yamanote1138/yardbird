@@ -104,10 +104,6 @@
             Mock mode
           </label>
         </div>
-        <div>
-          <label class="text-xs text-neutral-400 block mb-1">Tram prefix (optional)</label>
-          <UInput v-model="jmriForm.tramPrefix" placeholder="e.g. D" class="w-full" />
-        </div>
       </div>
     </template>
     <template #footer>
@@ -172,28 +168,27 @@ const errorMessage = ref('')
 
 const showJmriModal = ref(false)
 const jmriForm = reactive<Partial<JmriPluginConfig> & { port: string | number }>({
-  host: '', port: 12080, secure: false, mock: false, tramPrefix: '',
+  host: '', port: 12080, secure: false, mock: false,
 })
 
 function openJmriEdit() {
   const j = jmri.value
-  jmriForm.host       = j?.host ?? 'raspi-jmri.local'
-  jmriForm.port       = j?.port ?? 12080
-  jmriForm.secure     = j?.secure ?? false
-  jmriForm.mock       = j?.mock ?? false
-  jmriForm.tramPrefix = j?.tramPrefix ?? ''
+  jmriForm.host   = j?.host ?? 'raspi-jmri.local'
+  jmriForm.port   = j?.port ?? 12080
+  jmriForm.secure = j?.secure ?? false
+  jmriForm.mock   = j?.mock ?? false
   showJmriModal.value = true
 }
 
 function saveJmri() {
   const updated: JmriPluginConfig = {
-    host:        String(jmriForm.host ?? 'raspi-jmri.local'),
-    port:        Number(jmriForm.port ?? 12080),
-    secure:      !!jmriForm.secure,
-    mock:        !!jmriForm.mock,
-    tramPrefix:  jmriForm.tramPrefix || undefined,
+    host:            String(jmriForm.host ?? 'raspi-jmri.local'),
+    port:            Number(jmriForm.port ?? 12080),
+    secure:          !!jmriForm.secure,
+    mock:            !!jmriForm.mock,
     commandStations: jmri.value?.commandStations,
-    tramPwmFreq: jmri.value?.tramPwmFreq,
+    tramPwmFreq:     jmri.value?.tramPwmFreq,
+    rosterGroups:    jmri.value?.rosterGroups,
   }
   cfg.saveConnections({ ...cfg.connections.value, jmri: updated })
   showJmriModal.value = false
