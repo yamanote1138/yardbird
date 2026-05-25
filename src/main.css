@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
+/* Prevent native browser pull-to-refresh from firing behind our custom gesture */
+body {
+  overscroll-behavior-y: none;
+}
+
 :root {
   --ui-color-success-50: #f4fae5;
   --ui-color-success-100: #e7f4c9;

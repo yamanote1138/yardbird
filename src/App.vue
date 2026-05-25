@@ -65,10 +65,25 @@
     <UToaster />
 
     <!-- Content area: palette sidebar + tab canvas -->
-    <div class="flex min-h-0 overflow-hidden">
+    <div class="flex min-h-0 overflow-hidden relative">
       <WidgetPalette />
 
-      <div class="flex-1 overflow-auto px-4 md:px-6 pt-2 sm:pt-3 md:pt-4 min-w-0">
+      <!-- Pull-to-refresh indicator: slides down from behind the sticky header -->
+      <div
+        v-if="isPulling"
+        class="absolute inset-x-0 top-0 flex justify-center pointer-events-none z-[999]"
+        :style="{ transform: `translateY(${pullDistance - 48}px)`, transition: isPulling ? 'none' : 'transform 0.3s ease' }"
+      >
+        <div class="w-10 h-10 rounded-full bg-neutral-800 border border-white/10 shadow-lg flex items-center justify-center">
+          <UIcon
+            :name="isPastThreshold ? 'i-mdi-refresh' : 'i-mdi-arrow-down'"
+            class="w-5 h-5 text-success-400 transition-transform duration-200"
+            :class="{ 'animate-spin': isPastThreshold }"
+          />
+        </div>
+      </div>
+
+      <div ref="contentScrollEl" class="flex-1 overflow-auto px-4 md:px-6 pt-2 sm:pt-3 md:pt-4 min-w-0">
         <!-- No tabs yet: first-run welcome -->
         <div v-if="tabs.length === 0 && !editMode" class="flex flex-col items-center justify-center py-24 text-center px-4">
           <img src="/favicon.svg" class="w-16 h-16 mb-6 opacity-40" alt="YardBird" />
@@ -129,6 +144,7 @@ import TabManager from '@/components/TabManager.vue'
 
 import type { WidgetInstance } from '@/core/types'
 import { useWidgetConfig } from '@/composables/useWidgetConfig'
+import { usePullToRefresh } from '@/composables/usePullToRefresh'
 
 const cfg = useConfig()
 const { editMode, toggle: toggleEditMode, exit: exitEditMode } = useEditMode()
@@ -180,6 +196,12 @@ const setupRef = ref<InstanceType<typeof ConnectionSetup>>()
 
 // Map of tab id → canvas ref (populated by template)
 const canvasRefs = ref<Record<string, InstanceType<typeof TabCanvas>>>({})
+
+const contentScrollEl = ref<HTMLElement | null>(null)
+const { isPulling, pullDistance, isPastThreshold } = usePullToRefresh({
+  scrollEl: contentScrollEl,
+  enabled: computed(() => !editMode.value),
+})
 
 function openWidgetConfig(widgetId: string) {
   const tab = cfg.tabs.value.find(t => t.widgets.some(w => w.id === widgetId))
