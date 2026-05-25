@@ -25,6 +25,7 @@ export interface Throttle extends RosterEntry {
   directionVerified: boolean; // True if direction has been confirmed by JMRI
   functions: Record<string, ThrottleFunction>;
   acquiredAt: number; // Timestamp when throttle was acquired
+  prefix?: string; // Command station connection prefix (empty string = default)
 }
 
 export interface ThrottleFunction {

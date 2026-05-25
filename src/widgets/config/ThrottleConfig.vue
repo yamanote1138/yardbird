@@ -136,7 +136,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, defineComponent, h } from 'vue'
+import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
 import { useJmri } from '@/plugins/jmri'
 import type { RosterEntry } from '@/types/jmri'
 
@@ -146,6 +146,16 @@ const emit = defineEmits<{ update: [config: Record<string, unknown>] }>()
 const { ungroupedRoster, groupedRoster, commandStations, fetchRosterGroups, isConnected } = useJmri()
 
 const isReloading = ref(false)
+
+onMounted(async () => {
+  if (!isConnected.value) return
+  isReloading.value = true
+  try {
+    await fetchRosterGroups()
+  } finally {
+    isReloading.value = false
+  }
+})
 
 async function reloadRoster() {
   if (isReloading.value || !isConnected.value) return

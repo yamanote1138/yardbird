@@ -1,7 +1,7 @@
 import yaml from 'js-yaml'
 import type {
   StoredConfig, TabConfig, JmriPluginConfig, HomeAssistantPluginConfig,
-  CommandStationsConfig, RosterGroupConfig,
+  CommandStationsConfig,
 } from './types'
 
 // Sanitize raw parsed data (from localStorage or YAML import) into a valid StoredConfig.
@@ -28,7 +28,6 @@ export function sanitize(raw: unknown): StoredConfig | null {
     ...(typeof rj.secure === 'boolean' && { secure: rj.secure }),
     ...(typeof rj.mock === 'boolean' && { mock: rj.mock }),
     ...(Array.isArray(rj.commandStations) && { commandStations: rj.commandStations as CommandStationsConfig }),
-    ...(Array.isArray(rj.rosterGroups) && { rosterGroups: rj.rosterGroups as RosterGroupConfig[] }),
   }
 
   let homeassistant: HomeAssistantPluginConfig | undefined

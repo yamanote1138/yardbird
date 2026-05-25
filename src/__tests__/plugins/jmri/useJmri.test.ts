@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { useJmri, ConnectionState } from '@/plugins/jmri'
 import { PowerState, LightState } from 'jmri-client'
-import type { RosterGroupConfig } from '@/core/types'
 
 const MOCK_SETTINGS = {
   host: 'localhost',
@@ -9,14 +8,6 @@ const MOCK_SETTINGS = {
   protocol: 'ws' as const,
   mockEnabled: true,
   mockDelay: 0,
-}
-
-// Configure only 'diesels'; 'steam' (UP3985, addr 3985) will be ungrouped
-const MOCK_SETTINGS_WITH_GROUPS = {
-  ...MOCK_SETTINGS,
-  rosterGroups: [
-    { name: 'diesels', commandStation: 'D' },
-  ] satisfies RosterGroupConfig[],
 }
 
 async function connectMock(settings = MOCK_SETTINGS) {
@@ -150,33 +141,40 @@ describe('useJmri', () => {
 
   describe('roster groups', () => {
     // Mock data: diesels = [CSX754 addr 754, BNSF5240 addr 5240], steam = [UP3985 addr 3985]
-    // MOCK_SETTINGS_WITH_GROUPS configures only 'diesels' — steam ends up in ungroupedRoster
+    // All groups are fetched unconditionally — no config filter
 
-    it('fetchRosterGroups populates groupedRoster for configured groups', async () => {
-      const { fetchRosterGroups, groupedRoster } = await connectMock(MOCK_SETTINGS_WITH_GROUPS)
+    it('fetchRosterGroups populates ALL JMRI groups in groupedRoster', async () => {
+      const { fetchRosterGroups, groupedRoster } = await connectMock()
       await fetchRosterGroups()
+      expect(groupedRoster.value.length).toBeGreaterThanOrEqual(2)
       const diesels = groupedRoster.value.find(g => g.name === 'diesels')
+      const steam = groupedRoster.value.find(g => g.name === 'steam')
       expect(diesels).toBeDefined()
-      const addresses = diesels!.entries.map(e => e.address)
-      expect(addresses).toContain(754)
-      expect(addresses).toContain(5240)
+      expect(steam).toBeDefined()
     })
 
-    it('ungroupedRoster excludes entries belonging to configured groups', async () => {
-      const { fetchRosterGroups, ungroupedRoster } = await connectMock(MOCK_SETTINGS_WITH_GROUPS)
+    it('groupedRoster contains correct entries per group', async () => {
+      const { fetchRosterGroups, groupedRoster } = await connectMock()
+      await fetchRosterGroups()
+      const diesels = groupedRoster.value.find(g => g.name === 'diesels')
+      expect(diesels!.entries.map(e => e.address)).toContain(754)
+      expect(diesels!.entries.map(e => e.address)).toContain(5240)
+    })
+
+    it('ungroupedRoster excludes entries belonging to any fetched group', async () => {
+      const { fetchRosterGroups, ungroupedRoster } = await connectMock()
       await fetchRosterGroups()
       expect(ungroupedRoster.value.some(e => e.address === 754)).toBe(false)
       expect(ungroupedRoster.value.some(e => e.address === 5240)).toBe(false)
-      // UP3985 (steam group) is loaded but not in a configured group — appears here
-      expect(ungroupedRoster.value.some(e => e.address === 3985)).toBe(true)
+      expect(ungroupedRoster.value.some(e => e.address === 3985)).toBe(false)
     })
 
-    it('ungroupedRoster includes all entries when no groups are configured', async () => {
-      const { fetchRosterGroups, ungroupedRoster } = await connectMock()
+    it('clears stale groups on re-fetch', async () => {
+      const { fetchRosterGroups, groupedRoster } = await connectMock()
       await fetchRosterGroups()
-      expect(ungroupedRoster.value.some(e => e.address === 754)).toBe(true)
-      expect(ungroupedRoster.value.some(e => e.address === 3985)).toBe(true)
-      expect(ungroupedRoster.value.some(e => e.address === 5240)).toBe(true)
+      const countAfterFirst = groupedRoster.value.length
+      await fetchRosterGroups()
+      expect(groupedRoster.value.length).toBe(countAfterFirst)
     })
   })
 })

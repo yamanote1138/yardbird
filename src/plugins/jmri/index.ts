@@ -8,7 +8,7 @@ import { logger } from '@/utils/logger'
 import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
 import { JmriClient, PowerState, LightState } from 'jmri-client'
-import type { CommandStation, CommandStationsConfig, RosterGroupConfig } from '@/core/types'
+import type { CommandStation, CommandStationsConfig } from '@/core/types'
 
 // Connection state enum
 export enum ConnectionState {
@@ -23,7 +23,6 @@ export interface JmriConnectionSettings {
   protocol: 'ws' | 'wss'
   mockEnabled: boolean
   mockDelay?: number
-  rosterGroups?: RosterGroupConfig[]
   commandStationsConfig?: CommandStationsConfig
 }
 
@@ -439,25 +438,9 @@ export function useJmri() {
       logger.info(`Setting ${label}power:`, state.toUpperCase())
 
       if (state === 'off') {
-        const addresses = Array.from(jmriState.value.throttles.keys())
-        const groups = currentSettings?.rosterGroups ?? []
-
-        if (prefix === undefined) {
-          // Global power-off: release everything
-          for (const address of addresses) {
-            await releaseThrottle(address)
-          }
-        } else {
-          // Per-zone power-off: release throttles whose configured group's commandStation matches prefix.
-          // Throttles not in any configured group belong to the default connection (prefix "").
-          for (const address of addresses) {
-            const group = groups.find(g => {
-              const entries = groupedRosterEntries.value.get(g.name) ?? []
-              return entries.some(e => e.address === address)
-            })
-            const addressPrefix = group?.commandStation ?? ''
-            if (addressPrefix === prefix) await releaseThrottle(address)
-          }
+        for (const [address, throttle] of jmriState.value.throttles.entries()) {
+          const shouldRelease = prefix === undefined || (throttle.prefix ?? '') === prefix
+          if (shouldRelease) await releaseThrottle(address)
         }
       }
 
@@ -646,9 +629,7 @@ export function useJmri() {
     }
     try {
       logger.info('Fetching roster groups from JMRI')
-      const configuredNames = new Set(
-        (currentSettings?.rosterGroups ?? []).map(g => g.name)
-      )
+      groupedRosterEntries.value.clear()
       const allGroups = await jmriClient.getRosterGroups()
       const httpProtocol = currentSettings?.protocol === 'wss' ? 'https' : 'http'
       const { host, port, mockEnabled } = currentSettings ?? { host: '', port: 0, mockEnabled: false }
@@ -690,9 +671,7 @@ export function useJmri() {
           parsedEntries.push(rosterEntry)
         }
 
-        if (configuredNames.has(group.name)) {
-          groupedRosterEntries.value.set(group.name, parsedEntries)
-        }
+        groupedRosterEntries.value.set(group.name, parsedEntries)
       }
       logger.info(`Loaded ${allGroups.length} roster group(s) from JMRI`)
     } catch (error) {
@@ -843,7 +822,8 @@ export function useJmri() {
         direction: true, // Direction.FORWARD (default, unverified)
         directionVerified: false, // Will be verified when JMRI sends first update
         functions,
-        acquiredAt: Date.now()
+        acquiredAt: Date.now(),
+        prefix: prefix ?? '',
       }
       jmriState.value.throttles.set(address, throttle)
 
@@ -1186,10 +1166,7 @@ export function useJmri() {
         .filter(e => !groupedAddresses.has(e.address))
     }),
     groupedRoster: computed<{ name: string; entries: RosterEntry[] }[]>(() =>
-      (currentSettings?.rosterGroups ?? []).map(group => ({
-        name: group.name,
-        entries: groupedRosterEntries.value.get(group.name) ?? [],
-      }))
+      [...groupedRosterEntries.value.entries()].map(([name, entries]) => ({ name, entries }))
     ),
     throttles: computed(() => Array.from(jmriState.value.throttles.values())),
     turnouts: computed(() => Array.from(jmriState.value.turnouts.values())),

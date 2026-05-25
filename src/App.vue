@@ -273,7 +273,6 @@ const handleConnect = async () => {
       protocol: jmri.secure ? 'wss' : 'ws',
       mockEnabled: jmri.mock ?? false,
       mockDelay: 50,
-      rosterGroups: jmri.rosterGroups,
       commandStationsConfig: jmri.commandStations,
     }
 

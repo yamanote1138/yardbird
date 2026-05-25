@@ -9,12 +9,6 @@ plugins:
     # secure: false           # set true to use wss:// (requires TLS on JMRI)
     # mock: false             # set true to run without hardware
 
-    # Roster groups: name must match a JMRI roster group exactly (case-sensitive).
-    # commandStation routes per-zone power control to the right connection prefix.
-    # rosterGroups:
-    #   - name: trams
-    #     commandStation: D
-
     # Power zone buttons shown in the header.
     # Option 1 — explicit zones (prefix "" = default JMRI connection):
     # commandStations:
