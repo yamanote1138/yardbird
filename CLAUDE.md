@@ -137,6 +137,14 @@ public/
 9. **Heartbeat**
    - JMRI: 15-second heartbeat (JMRI disconnects after 30s idle)
 
+10. **Roster Groups**
+    - `rosterGroups` in YAML maps JMRI group names to command station prefixes (no address lists)
+    - `fetchRosterGroups()` calls `getRosterGroups()` + `getRosterEntriesByGroup()` from jmri-client v5.1+
+    - All fetched entries are added to `jmriState.roster`; only configured groups go into `groupedRosterEntries`
+    - `groupedRoster` computed: entries per configured group; `ungroupedRoster` computed: entries not in any configured group
+    - `jmri-client` exports its own `RosterGroup` type — our config type is `RosterGroupConfig` to avoid collision
+    - `fetchRoster()` mock mode is broken (issue #21); use `fetchRosterGroups()` to populate roster in tests
+
 ### Visual Configurator (feat/visual-configurator)
 
 The dashboard editor allows runtime layout customisation without editing YAML.
@@ -237,6 +245,24 @@ The entrypoint symlinks `/config/yardbird.yaml` → the web root if present.
 - Dashboard infrastructure: `src/widgets/` (registry, frames, palette, config modals)
 - Shared components (used by multiple plugins): `src/components/`
 - Tab `id` must be unique within the `tabs` array in `StoredConfig` / `yardbird.yaml`
+
+### Testing
+
+- **Framework**: Vitest v4+ with jsdom environment; `@vue/test-utils` for component tests
+- **Run**: `npm test` (single run), `npm run test:watch` (watch mode), `npm run coverage` (coverage report)
+- **Singleton reset**: module-scope composables must be reset in `afterEach`
+  - `useEditMode().exit()` — resets edit mode to false
+  - `useWidgetConfig().cancel()` — clears pending config state
+  - `useJmri().disconnect()` — clears all JMRI state; add a 50ms `setTimeout` flush after to let mock callbacks settle
+  - `useConfig` — use `vi.resetModules()` + `vi.doMock()` + dynamic import per test (module-scope init runs on import)
+- **JMRI mock mode**: set `mockEnabled: true` in settings; mock client auto-connects and serves fixture data
+- **`fetchRoster()` limitation (issue #21)**: mock data format differs from real JMRI; use `fetchRosterGroups()` to populate roster in tests — it calls `getRosterEntriesByGroup()` which works correctly in mock mode
+- **`vi.waitFor()`**: use as `vi.waitFor(fn, opts)` — it is NOT a standalone named export from vitest
+- **Test files**: `src/__tests__/<layer>/<module>.test.ts` mirroring `src/` structure
+
+### Future Component Tests
+
+Vue component tests (`.vue` files) will use `@vue/test-utils` with `mount`. These require Nuxt UI and Tailwind stubs; not yet implemented. Until then, test logic at the composable layer.
 
 ## Git Conventions
 
