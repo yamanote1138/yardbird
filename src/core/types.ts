@@ -1,5 +1,3 @@
-// ── Layout / YAML config ─────────────────────────────────────────────────────
-
 export interface CommandStation {
   name: string
   prefix: string  // empty string = default JMRI connection
@@ -76,14 +74,4 @@ export interface StoredConfig {
   tabs: TabConfig[]
 }
 
-// ── Legacy YAML config (used only by useLayout.ts as fallback source) ─────────
-
-export interface LayoutConfig {
-  debug?: boolean
-  plugins: {
-    jmri: JmriPluginConfig
-    homeassistant?: HomeAssistantPluginConfig
-  }
-  tabs: Array<{ id: string; name: string; icon: string }>
-}
 
