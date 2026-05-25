@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add a Vitest test suite covering the pure logic layer and JMRI integration (via jmri-client's built-in mock), plus CI workflows that gate the Docker publish behind passing tests.
+**Goal:** Refactor hardcoded tram address filtering into a general roster group system, then add a Vitest test suite covering the pure logic layer and JMRI integration, plus CI workflows that gate the Docker publish behind passing tests.
 
-**Architecture:** Vitest with jsdom environment. Composables are tested by importing them directly — Vue reactivity works without a mounted component. `useConfig` re-initialises on each test via `vi.resetModules()` + `vi.doMock()` to avoid stale singleton state. `useJmri` is reset by calling `disconnect()` in `afterEach`. jmri-client's `mock: { enabled: true }` option is used for JMRI tests — no real WebSocket connections or Vitest module mocking of jmri-client required.
+**Architecture:** Roster group membership is fetched from JMRI via `getRosterGroups()` + `getRosterEntriesByGroup()` (jmri-client v5.1.0). YAML config (`jmri.rosterGroups`) maps group names to `commandStation` prefixes for per-zone power routing — no address lists in config. `useJmri` exposes `ungroupedRoster` (entries not in any configured group) and `groupedRoster` (configured groups with resolved entries). Tests use Vitest with jsdom; jmri-client's built-in mock mode handles JMRI integration without a real WebSocket.
 
-**Tech Stack:** Vitest, @vue/test-utils, @vitest/coverage-v8, jsdom, GitHub Actions
+**Tech Stack:** Vue 3, TypeScript, Vitest, @vue/test-utils, @vitest/coverage-v8, jsdom, GitHub Actions
 
 ---
 
@@ -14,6 +14,12 @@
 
 | Action | Path | Purpose |
 |--------|------|---------|
+| Modify | `src/core/types.ts` | Add `RosterGroupConfig` (name + commandStation only — no addresses), remove `tramPrefix`, update `JmriPluginConfig` |
+| Modify | `src/plugins/jmri/index.ts` | Remove `TRAM_ADDRESSES`, replace per-zone power logic, replace `locoRoster`/`tramRoster` |
+| Modify | `src/widgets/config/ThrottleConfig.vue` | Dynamic grouped roster sections |
+| Modify | `src/App.vue` | Pass `rosterGroups` instead of `tramPrefix` |
+| Modify | `src/components/ConnectionSetup.vue` | Remove tramPrefix form field |
+| Modify | `public/yardbird.yaml` | Replace `tramPrefix` with `rosterGroups` config |
 | Create | `vitest.config.ts` | Vitest config with jsdom env + alias replication |
 | Create | `src/__tests__/utils/logger.test.ts` | Logger debug mode tests |
 | Create | `src/__tests__/widgets/registry.test.ts` | Widget registry shape tests |
@@ -28,7 +34,552 @@
 
 ---
 
-## Task 1: Install Vitest and configure
+## Task 1: Add RosterGroupConfig type and update config types
+
+**Files:**
+- Modify: `src/core/types.ts`
+
+Remove `tramPrefix` from `JmriPluginConfig`. Add `RosterGroupConfig` interface — name only (addresses come from JMRI) plus an optional `commandStation` prefix for power routing. Use `RosterGroupConfig` not `RosterGroup` to avoid collision with jmri-client's exported `RosterGroup` type (`{ name, length }`).
+
+- [ ] **Step 1: Update types.ts**
+
+In `src/core/types.ts`, replace the `JmriPluginConfig` interface with:
+
+```typescript
+export interface RosterGroupConfig {
+  name: string             // must match a JMRI roster group name exactly
+  commandStation?: string  // system connection prefix for per-zone power routing
+}
+
+export interface JmriPluginConfig {
+  host: string
+  port: number
+  secure?: boolean
+  mock?: boolean
+  tramPwmFreq?: number
+  commandStations?: CommandStationsConfig
+  rosterGroups?: RosterGroupConfig[]
+}
+```
+
+- [ ] **Step 2: Run type-check to see what breaks**
+
+```bash
+npm run type-check 2>&1 | head -40
+```
+
+This will show every downstream reference to `tramPrefix` that TypeScript now rejects. Do not fix them yet — the next tasks address each one.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/core/types.ts
+git commit -m "Add RosterGroupConfig type, remove tramPrefix from JmriPluginConfig"
+```
+
+---
+
+## Task 2: Refactor useJmri — remove TRAM_ADDRESSES, add grouped roster
+
+**Files:**
+- Modify: `src/plugins/jmri/index.ts`
+
+Five changes in this file:
+1. Remove the `TRAM_ADDRESSES` export and constant
+2. Update `JmriConnectionSettings` — remove `tramPrefix`, add `rosterGroups`
+3. Add internal `groupedRosterEntries` ref + `fetchRosterGroups()` function
+4. Replace per-zone power-off logic in `setPower`
+5. Replace `locoRoster`/`tramRoster` computeds with `ungroupedRoster`/`groupedRoster`
+
+- [ ] **Step 1: Update JmriConnectionSettings interface**
+
+Find and replace the interface (around line 24):
+
+```typescript
+export interface JmriConnectionSettings {
+  host: string
+  port: number
+  protocol: 'ws' | 'wss'
+  mockEnabled: boolean
+  mockDelay?: number
+  rosterGroups?: RosterGroupConfig[]
+  commandStationsConfig?: CommandStationsConfig
+}
+```
+
+Update the import for config types at the top of the file:
+
+```typescript
+import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
+import type { CommandStation, CommandStationsConfig, RosterGroupConfig } from '@/core/types'
+```
+
+- [ ] **Step 2: Remove TRAM_ADDRESSES**
+
+Delete this line (around line 31):
+
+```typescript
+export const TRAM_ADDRESSES = [30, 31] as const
+```
+
+- [ ] **Step 3: Add groupedRosterEntries internal state**
+
+After the `jmriState` declaration (around line 48), add:
+
+```typescript
+// Group name → resolved entries; populated by fetchRosterGroups()
+const groupedRosterEntries = ref<Map<string, RosterEntry[]>>(new Map())
+```
+
+In `disconnect()` (around line 1089), alongside the other `.clear()` calls, add:
+
+```typescript
+groupedRosterEntries.value.clear()
+```
+
+In the `'disconnected'` event handler (around line 218), also add a clear if that handler resets state — check the existing pattern and match it.
+
+- [ ] **Step 4: Add fetchRosterGroups() function**
+
+After `fetchRoster()` (around line 636), add:
+
+```typescript
+async function fetchRosterGroups() {
+  if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
+    logger.error('Cannot fetch roster groups: JMRI client not connected')
+    return
+  }
+  try {
+    logger.info('Fetching roster groups from JMRI')
+    const configuredNames = new Set(
+      (currentSettings?.rosterGroups ?? []).map(g => g.name)
+    )
+    const allGroups = await jmriClient.getRosterGroups()
+    const httpProtocol = currentSettings?.protocol === 'wss' ? 'https' : 'http'
+    const { host, port, mockEnabled } = currentSettings ?? { host: '', port: 0, mockEnabled: false }
+
+    for (const group of allGroups) {
+      const entries = await jmriClient.getRosterEntriesByGroup(group.name)
+      const parsedEntries: RosterEntry[] = []
+
+      for (const entry of entries) {
+        const entryData = entry.data
+        const address = parseInt(entryData.address)
+        let thumbnailUrl: string | undefined
+        if (mockEnabled) {
+          thumbnailUrl = `/locomotives/${entryData.name}.png`
+        } else {
+          thumbnailUrl = entryData.icon
+            ? `${httpProtocol}://${host}:${port}${entryData.icon}`
+            : entryData.name
+            ? `${httpProtocol}://${host}:${port}/roster/${encodeURI(entryData.name)}/icon?maxHeight=200`
+            : undefined
+        }
+        const rawFunctionKeys = entryData.functionKeys
+        const functionKeys: Record<string, string> = {}
+        if (Array.isArray(rawFunctionKeys)) {
+          for (const fn of rawFunctionKeys) {
+            if (fn.label && fn.name) functionKeys[fn.name] = fn.label
+          }
+        }
+        if (!functionKeys.F0) functionKeys.F0 = 'Headlight'
+        const rosterEntry: RosterEntry = {
+          address,
+          name: entryData.name || `Loco ${address}`,
+          road: entryData.road || '',
+          number: entryData.number || '',
+          thumbnailUrl,
+          functionKeys,
+        }
+        jmriState.value.roster.set(address, rosterEntry)
+        parsedEntries.push(rosterEntry)
+      }
+
+      if (configuredNames.has(group.name)) {
+        groupedRosterEntries.value.set(group.name, parsedEntries)
+      }
+    }
+    logger.info(`Loaded ${allGroups.length} roster group(s) from JMRI`)
+  } catch (error) {
+    logger.error('Failed to fetch roster groups:', error)
+    throw error
+  }
+}
+```
+
+- [ ] **Step 5: Replace per-zone power-off logic in setPower**
+
+Find this block in `setPower` (the `if (state === 'off')` block, around lines 441–460):
+
+```typescript
+if (state === 'off') {
+  const tramAddrs = TRAM_ADDRESSES as readonly number[]
+  const addresses = Array.from(jmriState.value.throttles.keys())
+
+  if (prefix === undefined) {
+    // Global power-off: release everything
+    for (const address of addresses) {
+      await releaseThrottle(address)
+    }
+  } else {
+    // Per-zone power-off: release only throttles on this connection
+    const tramPrefix = currentSettings?.tramPrefix ?? ''
+    for (const address of addresses) {
+      const isTram = tramAddrs.includes(address)
+      const onThisZone = isTram
+        ? prefix === tramPrefix
+        : prefix === '' || prefix === tramPrefix === false
+      if (onThisZone) await releaseThrottle(address)
+    }
+  }
+}
+```
+
+Replace with:
+
+```typescript
+if (state === 'off') {
+  const addresses = Array.from(jmriState.value.throttles.keys())
+  const groups = currentSettings?.rosterGroups ?? []
+
+  if (prefix === undefined) {
+    // Global power-off: release everything
+    for (const address of addresses) {
+      await releaseThrottle(address)
+    }
+  } else {
+    // Per-zone power-off: release throttles whose configured group's commandStation matches this prefix.
+    // Throttles not in any configured group are treated as the default connection (prefix "").
+    for (const address of addresses) {
+      const group = groups.find(g => {
+        const entries = groupedRosterEntries.value.get(g.name) ?? []
+        return entries.some(e => e.address === address)
+      })
+      const addressPrefix = group?.commandStation ?? ''
+      if (addressPrefix === prefix) {
+        await releaseThrottle(address)
+      }
+    }
+  }
+}
+```
+
+- [ ] **Step 6: Replace locoRoster and tramRoster computeds in the return block**
+
+Find (around lines 1115–1121):
+
+```typescript
+locoRoster: computed(() =>
+  Array.from(jmriState.value.roster.values())
+    .filter(e => !(TRAM_ADDRESSES as readonly number[]).includes(e.address))
+),
+tramRoster: computed(() =>
+  TRAM_ADDRESSES.map(addr => jmriState.value.roster.get(addr)).filter(Boolean) as import('@/types/jmri').RosterEntry[]
+),
+```
+
+Replace with:
+
+```typescript
+ungroupedRoster: computed(() => {
+  const groupedAddresses = new Set(
+    [...groupedRosterEntries.value.values()].flatMap(entries => entries.map(e => e.address))
+  )
+  return Array.from(jmriState.value.roster.values())
+    .filter(e => !groupedAddresses.has(e.address))
+}),
+groupedRoster: computed<{ name: string; entries: RosterEntry[] }[]>(() =>
+  (currentSettings?.rosterGroups ?? []).map(group => ({
+    name: group.name,
+    entries: groupedRosterEntries.value.get(group.name) ?? [],
+  }))
+),
+```
+
+Also add `fetchRosterGroups` to the return object alongside `fetchRoster`.
+
+- [ ] **Step 7: Run type-check**
+
+```bash
+npm run type-check 2>&1 | head -40
+```
+
+Expected: errors only in `ThrottleConfig.vue`, `App.vue`, `ConnectionSetup.vue` — not in `useJmri/index.ts` itself.
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add src/plugins/jmri/index.ts
+git commit -m "Replace TRAM_ADDRESSES with jmri-client roster group API in useJmri"
+```
+
+---
+
+## Task 3: Update ThrottleConfig.vue
+
+**Files:**
+- Modify: `src/widgets/config/ThrottleConfig.vue`
+
+Replace the hardcoded UTabs with dynamic grouped sections driven by `groupedRoster` and `ungroupedRoster`. Replace the entire file:
+
+- [ ] **Step 1: Replace ThrottleConfig.vue**
+
+```vue
+<template>
+  <div class="space-y-3">
+    <div>
+      <label class="text-sm text-neutral-300 block mb-1">DCC Address</label>
+      <UInput
+        v-model="addressStr"
+        type="number"
+        min="1"
+        max="9999"
+        placeholder="e.g. 3"
+        class="w-full"
+      />
+    </div>
+
+    <div v-if="commandStations.length > 0">
+      <label class="text-sm text-neutral-300 block mb-1">Command Station</label>
+      <div class="flex flex-wrap gap-1.5">
+        <button
+          v-for="cs in commandStations"
+          :key="cs.prefix"
+          class="px-2 py-1 text-xs rounded border transition-colors"
+          :class="selectedCommandStation === cs.prefix
+            ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+            : 'border-white/20 bg-white/5 text-neutral-300 hover:border-white/40'"
+          @click="selectedCommandStation = cs.prefix"
+        >
+          {{ cs.name }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="allRoster.length > 0" class="space-y-2">
+      <p class="text-xs text-neutral-500">Or pick from roster:</p>
+
+      <div v-for="group in groupedRoster" :key="group.name">
+        <p class="text-xs text-neutral-400 mb-1">{{ group.name }}</p>
+        <div class="flex flex-wrap gap-1.5">
+          <RosterButton
+            v-for="entry in group.entries"
+            :key="entry.address"
+            :entry="entry"
+            :selected="selectedAddress"
+            @select="selectedAddress = $event"
+          />
+          <p v-if="!group.entries.length" class="text-xs text-neutral-600">None connected</p>
+        </div>
+      </div>
+
+      <div v-if="ungroupedRoster.length > 0">
+        <p v-if="groupedRoster.length > 0" class="text-xs text-neutral-400 mb-1">DCC Locos</p>
+        <div class="flex flex-wrap gap-1.5">
+          <RosterButton
+            v-for="entry in ungroupedRoster"
+            :key="entry.address"
+            :entry="entry"
+            :selected="selectedAddress"
+            @select="selectedAddress = $event"
+          />
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, watch, defineComponent, h } from 'vue'
+import { useJmri } from '@/plugins/jmri'
+import type { RosterEntry } from '@/types/jmri'
+
+const props = defineProps<{ config: Record<string, unknown> }>()
+const emit = defineEmits<{ update: [config: Record<string, unknown>] }>()
+
+const { ungroupedRoster, groupedRoster, commandStations } = useJmri()
+
+const selectedAddress = ref<number>((props.config.address as number) ?? 0)
+const addressStr = computed({
+  get: () => selectedAddress.value > 0 ? String(selectedAddress.value) : '',
+  set: (v) => { const n = parseInt(v); if (!isNaN(n)) selectedAddress.value = n },
+})
+
+const selectedCommandStation = ref<string>(
+  (props.config.commandStation as string) ?? commandStations.value[0]?.prefix ?? ''
+)
+
+const allRoster = computed(() => [
+  ...groupedRoster.value.flatMap(g => g.entries),
+  ...ungroupedRoster.value,
+])
+
+const RosterButton = defineComponent({
+  props: {
+    entry: { type: Object as () => RosterEntry, required: true },
+    selected: { type: Number, required: true },
+  },
+  emits: ['select'],
+  setup(props, { emit }) {
+    return () => h('button', {
+      class: [
+        'px-2 py-1 text-xs rounded border transition-colors',
+        props.selected === props.entry.address
+          ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+          : 'border-white/20 bg-white/5 text-neutral-300 hover:border-white/40',
+      ],
+      onClick: () => emit('select', props.entry.address),
+    }, `${props.entry.name} (${props.entry.address})`)
+  },
+})
+
+watch([selectedAddress, selectedCommandStation], ([addr, cs]) => {
+  emit('update', { address: addr, commandStation: cs })
+}, { immediate: true })
+</script>
+```
+
+- [ ] **Step 2: Run type-check**
+
+```bash
+npm run type-check 2>&1 | head -40
+```
+
+Expected: errors only in `App.vue` and `ConnectionSetup.vue` now.
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add src/widgets/config/ThrottleConfig.vue
+git commit -m "Replace hardcoded tram tabs with dynamic roster group sections"
+```
+
+---
+
+## Task 4: Update App.vue, ConnectionSetup.vue, and yardbird.yaml
+
+**Files:**
+- Modify: `src/App.vue`
+- Modify: `src/components/ConnectionSetup.vue`
+- Modify: `public/yardbird.yaml`
+
+- [ ] **Step 1: Update App.vue**
+
+Find the `jmriSettings` object construction in `App.vue` (around line 270). Replace:
+
+```typescript
+tramPrefix: jmri.tramPrefix,
+```
+
+With:
+
+```typescript
+rosterGroups: jmri.rosterGroups,
+```
+
+In the `handleConnect` function, after the `await fetchRoster()` call (around line 319), add:
+
+```typescript
+try {
+  await fetchRosterGroups()
+} catch (error) {
+  logger.error('Failed to fetch roster groups:', error)
+}
+```
+
+Also update the destructure at the top of the `<script setup>` block to include `fetchRosterGroups`:
+
+```typescript
+const { initialize, disconnect, fetchRoster, fetchRosterGroups, isConnected, connectionState, railroadName, applyCommandStationsConfig, lastEvent: jmriLastEvent } = useJmri()
+```
+
+- [ ] **Step 2: Update ConnectionSetup.vue — remove tramPrefix from the template**
+
+Find and delete this block from the template:
+
+```html
+<div>
+  <label class="text-xs text-neutral-400 block mb-1">Tram prefix (optional)</label>
+  <UInput v-model="jmriForm.tramPrefix" placeholder="e.g. D" class="w-full" />
+</div>
+```
+
+- [ ] **Step 3: Update ConnectionSetup.vue — remove tramPrefix from the script**
+
+In the `jmriForm` reactive declaration, change:
+
+```typescript
+const jmriForm = reactive<Partial<JmriPluginConfig> & { port: string | number }>({
+  host: '', port: 12080, secure: false, mock: false, tramPrefix: '',
+})
+```
+
+To:
+
+```typescript
+const jmriForm = reactive<Partial<JmriPluginConfig> & { port: string | number }>({
+  host: '', port: 12080, secure: false, mock: false,
+})
+```
+
+In `openJmriEdit()`, delete:
+
+```typescript
+jmriForm.tramPrefix = j?.tramPrefix ?? ''
+```
+
+In `saveJmri()`, delete:
+
+```typescript
+tramPrefix:  jmriForm.tramPrefix || undefined,
+```
+
+- [ ] **Step 4: Update yardbird.yaml**
+
+Replace:
+
+```yaml
+tramPrefix: D
+tramPwmFreq: 3
+```
+
+With:
+
+```yaml
+tramPwmFreq: 3
+rosterGroups:
+  - name: Trams
+    commandStation: D
+```
+
+The `name` must match the JMRI roster group name exactly (case-sensitive). No `addresses` field — group membership is fetched from JMRI via `fetchRosterGroups()`.
+
+- [ ] **Step 5: Run type-check — expect clean**
+
+```bash
+npm run type-check
+```
+
+Expected: no errors.
+
+- [ ] **Step 6: Run the production build to confirm no runtime issues**
+
+```bash
+npm run build 2>&1 | tail -10
+```
+
+Expected: build completes with no errors.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/App.vue src/components/ConnectionSetup.vue public/yardbird.yaml
+git commit -m "Wire rosterGroups config end-to-end, remove tramPrefix"
+```
+
+---
+
+## Task 5: Install Vitest and configure
 
 **Files:**
 - Modify: `package.json`
@@ -54,7 +605,7 @@ In the `"scripts"` block, add after `"type-check"`:
 
 - [ ] **Step 3: Create vitest.config.ts**
 
-Do NOT merge with `vite.config.ts` — Nuxt UI's Vite plugin is not test-safe. Replicate only the aliases we need.
+Do NOT merge with `vite.config.ts` — Nuxt UI's Vite plugin is not test-safe. Replicate only the aliases.
 
 Create `vitest.config.ts` at project root:
 
@@ -89,8 +640,6 @@ Expected output (no test files yet):
 No test files found, exiting with code 0
 ```
 
-If it errors on missing packages or config syntax, fix before continuing.
-
 - [ ] **Step 5: Commit**
 
 ```bash
@@ -100,13 +649,12 @@ git commit -m "Add Vitest test infrastructure"
 
 ---
 
-## Task 2: Logger tests
+## Task 6: Logger tests
 
 **Files:**
-- Read: `src/utils/logger.ts`
 - Create: `src/__tests__/utils/logger.test.ts`
 
-The logger uses `console.log` for debug output (not `console.debug`). `setDebugMode(false)` suppresses it; `warn` and `error` always fire.
+The logger uses `console.log` for debug (not `console.debug`). `warn` and `error` always fire regardless of debug mode.
 
 - [ ] **Step 1: Write the tests**
 
@@ -166,7 +714,7 @@ describe('logger', () => {
 npm test
 ```
 
-Expected: 5 tests pass. Fix any failures before continuing.
+Expected: 5 tests pass.
 
 - [ ] **Step 3: Commit**
 
@@ -177,13 +725,12 @@ git commit -m "Add logger tests"
 
 ---
 
-## Task 3: Widget registry tests
+## Task 7: Widget registry tests
 
 **Files:**
-- Read: `src/widgets/registry.ts`, `src/core/types.ts`
 - Create: `src/__tests__/widgets/registry.test.ts`
 
-The registry has 5 widget types: `jmri-power`, `jmri-throttle`, `jmri-turnout`, `jmri-light`, `ha-entity`. There is no `jmri-tram` widget type.
+The registry has 5 widget types: `jmri-power`, `jmri-throttle`, `jmri-turnout`, `jmri-light`, `ha-entity`.
 
 - [ ] **Step 1: Write the tests**
 
@@ -260,7 +807,7 @@ describe('getWidgetDef', () => {
 npm test
 ```
 
-Expected: all registry tests pass. Fix any failures before continuing.
+Expected: all registry tests pass.
 
 - [ ] **Step 3: Commit**
 
@@ -271,10 +818,9 @@ git commit -m "Add widget registry tests"
 
 ---
 
-## Task 4: useEditMode tests
+## Task 8: useEditMode tests
 
 **Files:**
-- Read: `src/composables/useEditMode.ts`
 - Create: `src/__tests__/composables/useEditMode.test.ts`
 
 `editMode` is module-scope — reset with `exit()` in `afterEach`.
@@ -344,10 +890,9 @@ git commit -m "Add useEditMode tests"
 
 ---
 
-## Task 5: useWidgetConfig tests
+## Task 9: useWidgetConfig tests
 
 **Files:**
-- Read: `src/composables/useWidgetConfig.ts`
 - Create: `src/__tests__/composables/useWidgetConfig.test.ts`
 
 `pending` is module-scope. Reset by calling `cancel()` in `afterEach`.
@@ -468,15 +1013,14 @@ git commit -m "Add useWidgetConfig tests"
 
 ---
 
-## Task 6: useConfig tests
+## Task 10: useConfig tests
 
 **Files:**
-- Read: `src/core/useConfig.ts`, `src/core/useLayout.ts`
 - Create: `src/__tests__/core/useConfig.test.ts`
 
-`useConfig` calls `init()` at module scope. `init()` calls `useLayout()`. To prevent real YAML fetches in tests, mock `@/core/useLayout` with `vi.doMock()` (not hoisted) before each dynamic import of the module. `vi.resetModules()` ensures a fresh singleton per test.
+`useConfig` calls `init()` at module scope on load. `init()` calls `useLayout()` which fetches YAML over HTTP. Mock `@/core/useLayout` with `vi.doMock()` before each dynamic import. `vi.resetModules()` ensures a fresh singleton per test.
 
-The `save()` function does a shallow spread of `StoredConfig` keys — it does not recursively deep-merge nested objects.
+`save()` does a shallow spread at the `StoredConfig` key level — not a deep merge.
 
 - [ ] **Step 1: Write the tests**
 
@@ -495,7 +1039,6 @@ const MOCK_LAYOUT = {
   plugins: ref({ jmri: { host: 'localhost', port: 12080 } }),
 }
 
-// Fresh module + mock before each test
 async function freshConfig() {
   vi.resetModules()
   vi.doMock('@/core/useLayout', () => ({ useLayout: () => MOCK_LAYOUT }))
@@ -518,7 +1061,6 @@ describe('useConfig', () => {
         tabs: [{ id: 'stored-tab', name: 'Stored Tab', icon: 'i-mdi-home', widgets: [] }],
       }
       localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
-
       const { tabs } = await freshConfig()
       expect(tabs.value[0].id).toBe('stored-tab')
     })
@@ -531,7 +1073,6 @@ describe('useConfig', () => {
     it('ignores localStorage entry with wrong version', async () => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 99, connections: {}, tabs: [] }))
       const { tabs } = await freshConfig()
-      // Falls back to YAML mock which has yaml-tab
       expect(tabs.value[0].id).toBe('yaml-tab')
     })
 
@@ -570,7 +1111,7 @@ describe('useConfig', () => {
       save({ debug: true })
       expect(debug.value).toBe(true)
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!)
-      expect(stored.tabs[0].id).toBe('yaml-tab') // tabs untouched
+      expect(stored.tabs[0].id).toBe('yaml-tab')
     })
   })
 
@@ -612,7 +1153,7 @@ describe('useConfig', () => {
 npm test
 ```
 
-Expected: all tests pass. The `freshConfig()` helper resets modules before each test, so singleton state never bleeds between cases.
+Expected: all tests pass.
 
 - [ ] **Step 3: Commit**
 
@@ -623,17 +1164,16 @@ git commit -m "Add useConfig tests"
 
 ---
 
-## Task 7: useJmri integration tests
+## Task 11: useJmri integration tests
 
 **Files:**
-- Read: `src/plugins/jmri/index.ts`
 - Create: `src/__tests__/plugins/jmri/useJmri.test.ts`
 
-`useJmri` is a module-scope singleton. Call `disconnect()` in `afterEach` — it sets `connectionState` back to DISCONNECTED and clears all maps.
+`useJmri` is a module-scope singleton. Call `disconnect()` in `afterEach` — resets `connectionState` to DISCONNECTED and clears all maps.
 
 `initialize(settings)` creates the jmri-client and calls `connect()` internally. Connection is asynchronous; use `waitFor` to poll for `CONNECTED`.
 
-**Known limitation:** `fetchRoster()` fails with mock mode because jmri-client's mock data returns entries in a different format than the real JMRI server (tracked as issue #21 on jmri-client). Roster and tram-roster tests use `acquireThrottle()` instead, which creates synthetic roster entries — this still validates the tram-filtering logic in `locoRoster`.
+**Roster group tests** call `fetchRosterGroups()` which uses jmri-client's `getRosterGroups()` + `getRosterEntriesByGroup()`. Mock mode returns two groups: `diesels` (CSX754 addr 754, BNSF5240 addr 5240) and `steam` (UP3985 addr 3985). The `MOCK_SETTINGS_WITH_GROUPS` fixture configures only `diesels` — so steam entries appear in `ungroupedRoster`. This also validates that `fetchRosterGroups()` populates the roster (working around the `fetchRoster()` mock limitation, jmri-client issue #21).
 
 - [ ] **Step 1: Write the tests**
 
@@ -643,6 +1183,7 @@ Create `src/__tests__/plugins/jmri/useJmri.test.ts`:
 import { describe, it, expect, afterEach, waitFor } from 'vitest'
 import { useJmri, ConnectionState } from '@/plugins/jmri'
 import { PowerState, LightState } from 'jmri-client'
+import type { RosterGroupConfig } from '@/core/types'
 
 const MOCK_SETTINGS = {
   host: 'localhost',
@@ -652,9 +1193,17 @@ const MOCK_SETTINGS = {
   mockDelay: 0,
 }
 
-async function connectMock() {
+// Configure only the 'diesels' group; 'steam' (UP3985, addr 3985) will be ungrouped
+const MOCK_SETTINGS_WITH_GROUPS = {
+  ...MOCK_SETTINGS,
+  rosterGroups: [
+    { name: 'diesels', commandStation: 'D' },
+  ] satisfies RosterGroupConfig[],
+}
+
+async function connectMock(settings = MOCK_SETTINGS) {
   const jmri = useJmri()
-  jmri.initialize(MOCK_SETTINGS)
+  jmri.initialize(settings)
   await waitFor(() => {
     expect(jmri.connectionState.value).toBe(ConnectionState.CONNECTED)
   }, { timeout: 3000 })
@@ -728,11 +1277,8 @@ describe('useJmri', () => {
 
     it('toggles a light from OFF to ON', async () => {
       const { lights, toggleLight, jmriState } = await connectMock()
-      // Wait for lights to be fetched
       await waitFor(() => expect(lights.value.length).toBeGreaterThan(0), { timeout: 3000 })
-      // IL1 starts OFF in mock data
-      const il1Before = jmriState.value.lights.get('IL1')
-      expect(il1Before?.state).toBe(LightState.OFF)
+      expect(jmriState.value.lights.get('IL1')?.state).toBe(LightState.OFF)
       await toggleLight('IL1')
       await waitFor(() => {
         expect(jmriState.value.lights.get('IL1')?.state).toBe(LightState.ON)
@@ -751,11 +1297,9 @@ describe('useJmri', () => {
     it('throws a turnout', async () => {
       const { turnouts, throwTurnout, jmriState } = await connectMock()
       await waitFor(() => expect(turnouts.value.length).toBeGreaterThan(0), { timeout: 3000 })
-      // LT1 starts CLOSED (state 2) in mock data
       await throwTurnout('LT1')
       await waitFor(() => {
-        const t = jmriState.value.turnouts.get('LT1')
-        expect(t?.state).toBe(4) // TurnoutState.THROWN
+        expect(jmriState.value.turnouts.get('LT1')?.state).toBe(4) // TurnoutState.THROWN
       }, { timeout: 3000 })
     })
   })
@@ -784,16 +1328,37 @@ describe('useJmri', () => {
     })
   })
 
-  describe('locoRoster tram filtering', () => {
-    it('excludes tram addresses 30 and 31 from locoRoster', async () => {
-      const { acquireThrottle, locoRoster } = await connectMock()
-      // acquireThrottle creates synthetic roster entries for unknown addresses
-      await acquireThrottle(30)  // tram address
-      await acquireThrottle(31)  // tram address
-      await acquireThrottle(3)   // regular loco
-      expect(locoRoster.value.some(e => e.address === 30)).toBe(false)
-      expect(locoRoster.value.some(e => e.address === 31)).toBe(false)
-      expect(locoRoster.value.some(e => e.address === 3)).toBe(true)
+  describe('roster groups', () => {
+    // Mock data: diesels = [CSX754 addr 754, BNSF5240 addr 5240], steam = [UP3985 addr 3985]
+    // MOCK_SETTINGS_WITH_GROUPS configures only 'diesels' — steam entries end up in ungroupedRoster
+
+    it('fetchRosterGroups populates groupedRoster for configured groups', async () => {
+      const { fetchRosterGroups, groupedRoster } = await connectMock(MOCK_SETTINGS_WITH_GROUPS)
+      await fetchRosterGroups()
+      const diesels = groupedRoster.value.find(g => g.name === 'diesels')
+      expect(diesels).toBeDefined()
+      const addresses = diesels!.entries.map(e => e.address)
+      expect(addresses).toContain(754)
+      expect(addresses).toContain(5240)
+    })
+
+    it('ungroupedRoster excludes entries belonging to configured groups', async () => {
+      const { fetchRosterGroups, ungroupedRoster } = await connectMock(MOCK_SETTINGS_WITH_GROUPS)
+      await fetchRosterGroups()
+      // diesels members (754, 5240) should be absent
+      expect(ungroupedRoster.value.some(e => e.address === 754)).toBe(false)
+      expect(ungroupedRoster.value.some(e => e.address === 5240)).toBe(false)
+      // steam member (3985) is in a JMRI group but not configured — appears in ungrouped
+      expect(ungroupedRoster.value.some(e => e.address === 3985)).toBe(true)
+    })
+
+    it('ungroupedRoster includes all entries when no groups are configured', async () => {
+      const { fetchRosterGroups, ungroupedRoster } = await connectMock()
+      await fetchRosterGroups()
+      // All mock entries are loaded; none filtered into a configured group
+      expect(ungroupedRoster.value.some(e => e.address === 754)).toBe(true)
+      expect(ungroupedRoster.value.some(e => e.address === 3985)).toBe(true)
+      expect(ungroupedRoster.value.some(e => e.address === 5240)).toBe(true)
     })
   })
 })
@@ -805,7 +1370,7 @@ describe('useJmri', () => {
 npm test
 ```
 
-Expected: all tests pass. If turnout or light event tests are timing out, increase the `timeout` values. Fix any failures before continuing.
+Expected: all tests pass. If turnout or light event tests are timing out, increase the `timeout` values.
 
 - [ ] **Step 3: Commit**
 
@@ -816,14 +1381,14 @@ git commit -m "Add useJmri integration tests"
 
 ---
 
-## Task 8: Update CLAUDE.md
+## Task 12: Update CLAUDE.md
 
 **Files:**
 - Modify: `CLAUDE.md`
 
-Two additions: a **Testing** section under Development Conventions, and a **Future Considerations** note about component tests. Also correct the spec doc's erroneous mention of `jmri-tram` as a WidgetType.
+Two additions: a **Testing** section under Development Conventions, and a **Future Considerations** note about component tests.
 
-- [ ] **Step 1: Add Testing section to CLAUDE.md**
+- [ ] **Step 1: Add Testing section**
 
 In the **Development Conventions** section, after the existing "Component Organisation" subsection, add:
 
@@ -838,7 +1403,7 @@ In the **Development Conventions** section, after the existing "Component Organi
   - `useJmri`: call `disconnect()` in `afterEach`
   - `useConfig`: use `vi.resetModules()` + `vi.doMock('@/core/useLayout', ...)` + dynamic `await import('@/core/useConfig')` — the module calls `init()` on load and must be freshly imported per test
 - **JMRI tests use jmri-client's built-in mock mode** — pass `mockEnabled: true` to `initialize()`. No real WebSocket needed. No Vitest module mocking of jmri-client required.
-- Known limitation: `fetchRoster()` does not work correctly in mock mode (jmri-client issue #21 — mock data format mismatch). Roster tests use `acquireThrottle()` instead, which creates synthetic roster entries.
+- Known limitation: `fetchRoster()` does not work correctly in mock mode (jmri-client issue #21 — mock data format mismatch). Roster group tests use `fetchRosterGroups()` instead, which uses the v5.1.0 `getRosterEntriesByGroup()` API and works correctly in mock mode.
 
 ### Future: Component Tests
 
@@ -852,7 +1417,21 @@ Priority targets when that time comes:
 Test behaviour from the user's perspective, not implementation details. Mount with `@vue/test-utils`' `mount()` and assert on emitted events and rendered output — not on internal refs or method calls.
 ```
 
-- [ ] **Step 2: Run type-check to make sure nothing broke**
+- [ ] **Step 2: Update the roster groups architecture note**
+
+In the **Key Architectural Decisions** section, add a new entry for roster groups:
+
+```markdown
+10. **Roster Groups**
+   - Group membership is fetched from JMRI via `useJmri().fetchRosterGroups()` (calls jmri-client `getRosterGroups()` + `getRosterEntriesByGroup()`)
+   - YAML `jmri.rosterGroups` = `RosterGroupConfig[]` where each entry is `{ name, commandStation? }` — maps JMRI group names to power routing prefixes; no address lists
+   - `useJmri` exposes `ungroupedRoster` (entries not in any configured group) and `groupedRoster` (configured groups with resolved `RosterEntry[]`)
+   - `fetchRosterGroups()` loads ALL JMRI groups into the roster; only configured groups appear in `groupedRoster`
+   - Per-zone power-off releases throttles whose configured group's `commandStation` matches the zone prefix; unconfigured-group throttles use the default connection (`""`)
+   - Note: `RosterGroupConfig` (our config type) ≠ jmri-client's exported `RosterGroup` (`{ name, length }`) — different shapes, different purposes
+```
+
+- [ ] **Step 3: Run type-check**
 
 ```bash
 npm run type-check
@@ -860,25 +1439,23 @@ npm run type-check
 
 Expected: no errors.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
 git add CLAUDE.md
-git commit -m "Add testing section to CLAUDE.md"
+git commit -m "Update CLAUDE.md: testing section + roster groups architecture"
 ```
 
 ---
 
-## Task 9: Add CI workflow
+## Task 13: Add CI workflow
 
 **Files:**
 - Create: `.github/workflows/ci.yml`
 
-Runs on every push to `main` and on all pull requests. This gives fast feedback for Dependabot PRs automatically.
+Runs on every push to `main` and on all pull requests. Gives fast feedback for Dependabot PRs automatically.
 
 - [ ] **Step 1: Create ci.yml**
-
-Create `.github/workflows/ci.yml`:
 
 ```yaml
 name: CI
@@ -921,20 +1498,14 @@ git commit -m "Add CI workflow"
 
 ---
 
-## Task 10: Gate Docker publish behind tests
+## Task 14: Gate Docker publish behind tests
 
 **Files:**
 - Modify: `.github/workflows/docker-build-push.yml`
 
-Add a `test` job that mirrors CI. The existing `docker` job gets `needs: test` — the image is never pushed if tests or type-check fail. The `v*` tag trigger is unchanged.
+Add a `test` job. The existing `docker` job gets `needs: test`. The `v*` tag trigger is unchanged.
 
-- [ ] **Step 1: Read the current workflow**
-
-Read `.github/workflows/docker-build-push.yml` to confirm the current structure before editing.
-
-- [ ] **Step 2: Add the test job and needs gate**
-
-Replace the contents of `.github/workflows/docker-build-push.yml` with:
+- [ ] **Step 1: Replace docker-build-push.yml**
 
 ```yaml
 name: Build and Push Docker Image
@@ -1004,7 +1575,7 @@ jobs:
           cache-to: type=gha,mode=max
 ```
 
-- [ ] **Step 3: Run all tests locally one final time**
+- [ ] **Step 2: Run all tests locally one final time**
 
 ```bash
 npm test
@@ -1012,7 +1583,7 @@ npm test
 
 Expected: all tests pass.
 
-- [ ] **Step 4: Commit and push**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/docker-build-push.yml
@@ -1024,22 +1595,23 @@ git push
 
 ## Self-Review
 
-**Spec coverage check:**
-- ✅ Vitest + jsdom + @vue/test-utils + @vitest/coverage-v8 → Task 1
-- ✅ `useConfig` tests (init priority, save, saveTabs, saveConnections, reset) → Task 6
-- ✅ `useEditMode` tests → Task 4
-- ✅ `useWidgetConfig` tests → Task 5
-- ✅ `registry.ts` tests → Task 3
-- ✅ `logger.ts` tests → Task 2
-- ✅ `useJmri` mock integration (connect, hello, power, lights, turnouts, throttles, tram filtering) → Task 7
-- ✅ Singleton reset pattern documented and implemented in every test file
-- ✅ CLAUDE.md: testing section + future component tests → Task 8
-- ✅ `ci.yml` on push/PR → Task 9
-- ✅ Docker publish gated behind `needs: test` → Task 10
-- ✅ `jmri-tram` corrected — not a WidgetType, not in registry
+**Spec coverage:**
+- ✅ `RosterGroupConfig` type (name + commandStation, no addresses) + `rosterGroups` on `JmriPluginConfig` → Task 1
+- ✅ Remove `TRAM_ADDRESSES`, add `fetchRosterGroups()`, generalise per-zone power logic → Task 2
+- ✅ `ungroupedRoster` / `groupedRoster` computeds driven by `groupedRosterEntries` → Task 2
+- ✅ Dynamic roster picker in `ThrottleConfig.vue` → Task 3
+- ✅ `App.vue`, `ConnectionSetup.vue`, `yardbird.yaml` wired up → Task 4
+- ✅ Vitest + jsdom + @vue/test-utils → Task 5
+- ✅ Logger tests → Task 6
+- ✅ Registry tests (correct 5-type set, no jmri-tram) → Task 7
+- ✅ useEditMode tests → Task 8
+- ✅ useWidgetConfig tests → Task 9
+- ✅ useConfig tests (init priority, save, reset) → Task 10
+- ✅ useJmri tests — connection, power, lights, turnouts, throttles, roster groups (via `fetchRosterGroups()` + mock diesels/steam data) → Task 11
+- ✅ CLAUDE.md — testing section + roster groups architecture note → Task 12
+- ✅ CI on push/PR → Task 13
+- ✅ Docker publish gated behind `needs: test` → Task 14
 
-**Spec error noted:** The design spec incorrectly listed `jmri-tram` as a WidgetType. The actual `WidgetType` union in `src/core/types.ts` contains only: `jmri-power`, `jmri-throttle`, `jmri-turnout`, `jmri-light`, `ha-entity`. Tram control uses address-based throttle acquisition, not a distinct widget type. The registry tests and useJmri tests reflect the correct set.
+**Placeholder scan:** No TBDs, no vague instructions. All steps have exact commands or complete code.
 
-**Placeholder scan:** No TBDs, no "implement later", no vague instructions. Every step has exact commands or complete code blocks.
-
-**Type consistency:** `ConnectionState` imported from `@/plugins/jmri`; `PowerState`, `LightState` from `jmri-client`; `WidgetType`, `WidgetInstance` from `@/core/types`. All consistent across tasks.
+**Type consistency:** `RosterGroupConfig` defined in `src/core/types.ts` and imported as `RosterGroupConfig` throughout — never confused with jmri-client's `RosterGroup`. `ungroupedRoster`/`groupedRoster` named consistently across `useJmri` return, `ThrottleConfig.vue`, and test assertions. `ConnectionState`/`PowerState`/`LightState` imported from correct packages throughout. Mock addresses 754, 5240 (diesels) and 3985 (steam) used consistently in test assertions.
