@@ -11,14 +11,19 @@ export interface CommandStation {
 //   - missing / { discover: false } → single default power button (fallback)
 export type CommandStationsConfig = CommandStation[] | { discover: boolean }
 
+export interface RosterGroupConfig {
+  name: string             // must match a JMRI roster group name exactly
+  commandStation?: string  // system connection prefix for per-zone power routing
+}
+
 export interface JmriPluginConfig {
   host: string
   port: number
   secure?: boolean
   mock?: boolean
-  tramPrefix?: string  // kept for legacy PWM power-zone routing; not used for throttle acquisition
   tramPwmFreq?: number
   commandStations?: CommandStationsConfig
+  rosterGroups?: RosterGroupConfig[]
 }
 
 export interface HomeAssistantPluginConfig {
