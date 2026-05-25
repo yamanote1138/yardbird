@@ -4,7 +4,7 @@ This file contains project conventions, architecture decisions, and development 
 
 ## Project Overview
 
-**YardBird** is a pure frontend SPA for model railroad control. The browser connects directly to JMRI via WebSocket — no backend server required. Connections are configured via `yardbird.yaml` (factory default) and a runtime dashboard editor; layout config persists in `localStorage`.
+**YardBird** is a pure frontend SPA for model railroad control. The browser connects directly to JMRI via WebSocket — no backend server required. Connections are configured via the setup screen (manual entry or YAML import); layout config persists in `localStorage`.
 
 ### Tech Stack
 - **Vue 3** with Composition API and TypeScript
@@ -12,7 +12,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Nuxt UI 4** + **Tailwind CSS 4** for responsive UI components
 - **Iconify** (Material Design Icons + Heroicons) for icons
 - **jmri-client 4.2+** for WebSocket-based JMRI communication (includes connection prefix support)
-- **js-yaml** for parsing `yardbird.yaml` at startup
+- **js-yaml** for YAML import/export (`useYamlConfig.ts`)
 - **gridstack** for drag-and-drop / resize dashboard grid (widget canvas)
 - **vue-draggable-plus** (SortableJS) for tab reordering in edit mode
 - **Node.js 22+** required
@@ -28,17 +28,17 @@ v8.0.0 — Visual configurator release. Vite 8, TypeScript 6, @vitejs/plugin-vue
 
 ### Pure Frontend SPA
 - **No backend server** — browser communicates directly with JMRI via WebSocket
-- **YAML-driven config** — `public/yardbird.yaml` (dev) or `/config/yardbird.yaml` (Docker volume)
+- **localStorage-first config** — `useConfig` is a pure localStorage manager; YAML is import/export only
 - **Plugin system** — each integration lives in `src/plugins/<name>/` with an `index.ts` composable and `components/` directory
-- **Mock mode** — run without hardware by setting `mock: true` in the JMRI plugin config
+- **Mock mode** — run without hardware by setting `mock: true` in the JMRI connection config
 
 ### Project Structure
 ```
 src/
 ├── core/
-│   ├── types.ts          — LayoutConfig, StoredConfig, WidgetInstance, plugin configs, PowerZone types
-│   ├── useLayout.ts      — Fetches and parses yardbird.yaml; used as YAML fallback by useConfig
-│   └── useConfig.ts      — Active config: reads localStorage, falls back to useLayout; exposes save()
+│   ├── types.ts          — StoredConfig, WidgetInstance, plugin configs, PowerZone types
+│   ├── useConfig.ts      — Pure localStorage manager: sanitize on load, needsSetup, applyImport, save()
+│   └── useYamlConfig.ts  — Stateless YAML import/export: sanitize(), importYaml(), exportYaml()
 │
 ├── composables/          — App-level singletons (not plugin-specific)
 │   ├── useEditMode.ts    — Edit mode toggle (module-scope ref)
@@ -97,13 +97,15 @@ public/
    - Single instance shared across all components — prevents multiple WebSocket connections
    - State persists across component mount/unmount cycles
 
-3. **Config Flow (localStorage → YAML → DEFAULT_CONFIG)**
-   - `useConfig.ts` is the active config source. Priority: `localStorage` key `yardbird:config` → YAML via `useLayout.ts` → `DEFAULT_CONFIG`
-   - On first load from YAML: migrates `tabs` into `StoredConfig` format and saves to localStorage
-   - `useConfig.save(patch)` persists partial updates to localStorage (deep-merges)
-   - `useConfig.reset()` clears localStorage; next load re-reads YAML
-   - `useLayout.ts` remains but is only used as the YAML fallback — not called directly by components
-   - `App.vue` reads from `useConfig` for tabs, connections, and debug flag
+3. **Config Flow (localStorage only)**
+   - `useConfig.ts` is a pure localStorage manager — no YAML dependency at runtime
+   - On load: reads `yardbird:config` from localStorage, runs through `sanitize()` (strips unknown/deprecated fields), sets `needsSetup = true` if empty or invalid
+   - `needsSetup: true` → `ConnectionSetup.vue` is shown; user fills in the form manually or imports a YAML file
+   - YAML (`public/yardbird.yaml`) is a blank template — served for Docker operators to volume-mount a seed config
+   - Docker banner: on mount, `ConnectionSetup` fetches `/yardbird.yaml`; if it has a real host, shows an import prompt
+   - `applyImport(config)` sets config from a parsed `StoredConfig` and clears `needsSetup`
+   - `saveConnections()` also works when `needsSetup` (config is null) — creates a fresh config
+   - `reset()` clears localStorage and sets `needsSetup = true`
 
 4. **Tram Throttle Behaviour**
    - Tram addresses 30 (inner loop) and 31 (outer loop) are filtered from the main JMRI loco roster
@@ -197,27 +199,26 @@ Each `WidgetType` entry defines: display name, icon, default/min grid size, Vue 
 - × to delete (confirms if tab has widgets)
 
 #### Connection Management
-- `ConnectionSetup.vue` reads from `useConfig` — shows saved connections prefilled from localStorage/YAML
-- "Edit" per connection → form modal → saves via `useConfig.save()`
-- Supports JMRI and Home Assistant connections
+- `ConnectionSetup.vue` shows when `needsSetup` is true (no valid config) or when the user navigates back
+- First-run: form starts blank; optional Docker banner if `/yardbird.yaml` has a real host
+- "Configure/Edit" per connection → form modal → `saveConnections()` → clears `needsSetup`
+- "Import config" link → file input → `importYaml()` → `applyImport()` with warnings display
+- "Export config" link → `exportYaml()` → Blob download as `yardbird.yaml`
 
 ## Configuration
 
-All layout and connection settings live in `yardbird.yaml`. The browser fetches it from `/yardbird.yaml` at startup.
+Config lives entirely in `localStorage` key `yardbird:config` (a `StoredConfig` JSON blob).
 
-**In development:** edit `public/yardbird.yaml` — Vite serves `public/` as static files.
+**First-run setup:** Enter JMRI host/port manually in the setup screen, or import a YAML file.
 
-**In Docker/production:** volume-mount a `config/` directory:
-```yaml
-volumes:
-  - ./config:/config   # place yardbird.yaml inside config/
-```
-The entrypoint symlinks `/config/yardbird.yaml` → the web root if present.
+**Docker operators:** Volume-mount a pre-filled `yardbird.yaml` to `/config/yardbird.yaml`. The entrypoint symlinks it to the web root. The setup screen detects it and offers a one-click import.
 
-**Tram config notes (under `jmri:`):**
-- `tramPrefix` — system connection prefix for the DCC-EX hardware connection (e.g. `D`); omit for single-connection layouts
-- `tramPwmFreq` — default DC PWM frequency index applied on tram acquire: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic (default 3)
-- `powerZones` — array of `{name, prefix}` objects, or `{discover: true}`, or omit for single button. See `yardbird.example.yaml` for all modes.
+**In development:** `public/yardbird.yaml` is a blank template — edit it to test the Docker banner, or just fill in the setup form.
+
+**Config notes:**
+- `tramPrefix` — **deprecated**, silently stripped on load/import; ignored
+- `tramPwmFreq` — default DC PWM frequency index: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic (default 3)
+- `commandStations` — array of `{name, prefix}`, or `{discover: true}`, or omit for single button
 
 ## Development Conventions
 
@@ -301,7 +302,7 @@ GitHub Actions builds and pushes the Docker image on tag push.
 |---|---|---|
 | `PORT` | Host port for the web app | 9273 |
 
-No `YB_*` variables — all app config lives in `yardbird.yaml`.
+No `YB_*` variables — app config lives in the browser's localStorage; seed via `/config/yardbird.yaml` volume mount.
 
 ## Common Tasks
 
@@ -327,8 +328,8 @@ Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
 ## Troubleshooting
 
 **Trams won't acquire / wrong hardware**
-- Set `tramPrefix` in `yardbird.yaml` to match the DCC-EX prefix in JMRI Preferences → Connections
-- Enable `debug: true` and check the browser console for acquisition errors
+- Ensure `commandStation` in the JMRI connection config matches the DCC-EX prefix in JMRI Preferences → Connections
+- Enable `debug: true` in the connection settings and check the browser console for acquisition errors
 
 **Power zone shows UNKNOWN after connect**
 - JMRI doesn't reliably return named-connection power state via WebSocket — this is expected
@@ -336,11 +337,11 @@ Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
 
 **Cannot connect to JMRI**
 - Verify JMRI WebSocket server enabled: *Preferences → Web Server → JSON WebSocket*
-- Set `debug: true` in `yardbird.yaml` and check browser console
+- Enable `debug: true` in the connection settings and check browser console
 
 **Config changes not appearing**
-- `yardbird.yaml` is read once at startup as a fallback; live config is in `localStorage` key `yardbird:config`
-- To reset to YAML defaults: call `useConfig().reset()` or clear `yardbird:config` from DevTools → Application → Local Storage
+- Live config is in `localStorage` key `yardbird:config`
+- To reset: click "Reset" on the setup screen, or clear `yardbird:config` from DevTools → Application → Local Storage
 - Reload the page after any manual localStorage edit
 
 ---
