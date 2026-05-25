@@ -8,7 +8,7 @@ import { logger } from '@/utils/logger'
 import type { JmriState, Throttle, RosterEntry, Direction, ThrottleFunction, LightData } from '@/types/jmri'
 
 import { JmriClient, PowerState, LightState } from 'jmri-client'
-import type { CommandStation, CommandStationsConfig } from '@/core/types'
+import type { CommandStation, CommandStationsConfig, RosterGroupConfig } from '@/core/types'
 
 // Connection state enum
 export enum ConnectionState {
@@ -23,12 +23,9 @@ export interface JmriConnectionSettings {
   protocol: 'ws' | 'wss'
   mockEnabled: boolean
   mockDelay?: number
-  tramPrefix?: string // System connection prefix for tram throttles, e.g. 'D' for DCC++
+  rosterGroups?: RosterGroupConfig[]
   commandStationsConfig?: CommandStationsConfig
 }
-
-// Tram DCC addresses — these are filtered out of the main locomotive roster
-export const TRAM_ADDRESSES = [30, 31] as const
 
 // Background-tab brake watchdog. JMRI's idle-kill is 30s; the heartbeat is 15s,
 // so worst case the last beat fired at t=-14s leaving ~16s before JMRI cuts us.
@@ -51,6 +48,9 @@ const jmriState = ref<JmriState>({
   turnouts: new Map(),
   lights: new Map()
 })
+
+// Group name → resolved entries; populated by fetchRosterGroups()
+const groupedRosterEntries = ref<Map<string, RosterEntry[]>>(new Map())
 
 const connectionState = ref<ConnectionState>(ConnectionState.DISCONNECTED)
 const isServerOnline = ref<boolean>(true) // Browser/web server connectivity
@@ -439,8 +439,8 @@ export function useJmri() {
       logger.info(`Setting ${label}power:`, state.toUpperCase())
 
       if (state === 'off') {
-        const tramAddrs = TRAM_ADDRESSES as readonly number[]
         const addresses = Array.from(jmriState.value.throttles.keys())
+        const groups = currentSettings?.rosterGroups ?? []
 
         if (prefix === undefined) {
           // Global power-off: release everything
@@ -448,14 +448,15 @@ export function useJmri() {
             await releaseThrottle(address)
           }
         } else {
-          // Per-zone power-off: release only throttles on this connection
-          const tramPrefix = currentSettings?.tramPrefix ?? ''
+          // Per-zone power-off: release throttles whose configured group's commandStation matches prefix.
+          // Throttles not in any configured group belong to the default connection (prefix "").
           for (const address of addresses) {
-            const isTram = tramAddrs.includes(address)
-            const onThisZone = isTram
-              ? prefix === tramPrefix
-              : prefix === '' || prefix === tramPrefix === false
-            if (onThisZone) await releaseThrottle(address)
+            const group = groups.find(g => {
+              const entries = groupedRosterEntries.value.get(g.name) ?? []
+              return entries.some(e => e.address === address)
+            })
+            const addressPrefix = group?.commandStation ?? ''
+            if (addressPrefix === prefix) await releaseThrottle(address)
           }
         }
       }
@@ -631,6 +632,71 @@ export function useJmri() {
       logger.info(`Loaded ${roster.length} locomotives from roster`)
     } catch (error) {
       logger.error('Failed to fetch roster:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Fetch roster groups from JMRI and populate roster + groupedRosterEntries
+   */
+  async function fetchRosterGroups() {
+    if (!jmriClient || connectionState.value !== ConnectionState.CONNECTED) {
+      logger.error('Cannot fetch roster groups: JMRI client not connected')
+      return
+    }
+    try {
+      logger.info('Fetching roster groups from JMRI')
+      const configuredNames = new Set(
+        (currentSettings?.rosterGroups ?? []).map(g => g.name)
+      )
+      const allGroups = await jmriClient.getRosterGroups()
+      const httpProtocol = currentSettings?.protocol === 'wss' ? 'https' : 'http'
+      const { host, port, mockEnabled } = currentSettings ?? { host: '', port: 0, mockEnabled: false }
+
+      for (const group of allGroups) {
+        const entries = await jmriClient.getRosterEntriesByGroup(group.name)
+        const parsedEntries: RosterEntry[] = []
+
+        for (const entry of entries) {
+          const entryData = entry.data
+          const address = parseInt(entryData.address)
+          let thumbnailUrl: string | undefined
+          if (mockEnabled) {
+            thumbnailUrl = `/locomotives/${entryData.name}.png`
+          } else {
+            thumbnailUrl = entryData.icon
+              ? `${httpProtocol}://${host}:${port}${entryData.icon}`
+              : entryData.name
+              ? `${httpProtocol}://${host}:${port}/roster/${encodeURI(entryData.name)}/icon?maxHeight=200`
+              : undefined
+          }
+          const rawFunctionKeys = entryData.functionKeys
+          const functionKeys: Record<string, string> = {}
+          if (Array.isArray(rawFunctionKeys)) {
+            for (const fn of rawFunctionKeys) {
+              if (fn.label && fn.name) functionKeys[fn.name] = fn.label
+            }
+          }
+          if (!functionKeys.F0) functionKeys.F0 = 'Headlight'
+          const rosterEntry: RosterEntry = {
+            address,
+            name: entryData.name || `Loco ${address}`,
+            road: entryData.road || '',
+            number: entryData.number || '',
+            thumbnailUrl,
+            functionKeys,
+          }
+          jmriState.value.roster.set(address, rosterEntry)
+          parsedEntries.push(rosterEntry)
+        }
+
+        if (configuredNames.has(group.name)) {
+          groupedRosterEntries.value.set(group.name, parsedEntries)
+        }
+      }
+      logger.info(`Loaded ${allGroups.length} roster group(s) from JMRI`)
+    } catch (error) {
+      logger.error('Failed to fetch roster groups:', error)
       throw error
     }
   }
@@ -1091,6 +1157,7 @@ export function useJmri() {
     jmriState.value.roster.clear()
     jmriState.value.turnouts.clear()
     jmriState.value.lights.clear()
+    groupedRosterEntries.value.clear()
     jmriState.value.power = 0
     railroadName.value = 'Model Railroad'
     jmriVersion.value = ''
@@ -1112,12 +1179,18 @@ export function useJmri() {
     // Computed
     isConnected: computed(() => connectionState.value === ConnectionState.CONNECTED),
     isMockMode: computed(() => currentSettings?.mockEnabled ?? false),
-    locoRoster: computed(() =>
-      Array.from(jmriState.value.roster.values())
-        .filter(e => !(TRAM_ADDRESSES as readonly number[]).includes(e.address))
-    ),
-    tramRoster: computed(() =>
-      TRAM_ADDRESSES.map(addr => jmriState.value.roster.get(addr)).filter(Boolean) as import('@/types/jmri').RosterEntry[]
+    ungroupedRoster: computed(() => {
+      const groupedAddresses = new Set(
+        [...groupedRosterEntries.value.values()].flatMap(entries => entries.map(e => e.address))
+      )
+      return Array.from(jmriState.value.roster.values())
+        .filter(e => !groupedAddresses.has(e.address))
+    }),
+    groupedRoster: computed<{ name: string; entries: RosterEntry[] }[]>(() =>
+      (currentSettings?.rosterGroups ?? []).map(group => ({
+        name: group.name,
+        entries: groupedRosterEntries.value.get(group.name) ?? [],
+      }))
     ),
     throttles: computed(() => Array.from(jmriState.value.throttles.values())),
     turnouts: computed(() => Array.from(jmriState.value.turnouts.values())),
@@ -1132,6 +1205,7 @@ export function useJmri() {
     setThrottleDirection,
     setThrottleFunction,
     fetchRoster,
+    fetchRosterGroups,
     fetchTurnouts,
     fetchLights,
     toggleLight,
