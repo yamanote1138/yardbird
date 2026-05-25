@@ -115,4 +115,59 @@ describe('useConfig', () => {
       expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
     })
   })
+
+  describe('yaml backfill', () => {
+    it('backfills missing jmri fields from YAML into stored config', async () => {
+      const stored = {
+        version: 1,
+        connections: { jmri: { host: 'myhost', port: 12080 } },
+        tabs: [{ id: 'stored-tab', name: 'Stored', icon: 'i-mdi-home', widgets: [] }],
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+
+      vi.resetModules()
+      vi.doMock('@/core/useLayout', () => ({
+        useLayout: () => ({
+          loading: ref(false),
+          debug: ref(false),
+          tabs: ref([]),
+          plugins: ref({
+            jmri: { host: 'localhost', port: 12080, rosterGroups: [{ name: 'Trams', commandStation: 'D' }] },
+          }),
+        }),
+      }))
+      const { useConfig } = await import('@/core/useConfig')
+      const cfg = useConfig()
+      await vi.waitFor(() => expect(cfg.loading.value).toBe(false), { timeout: 3000 })
+
+      expect(cfg.jmri.value?.rosterGroups).toEqual([{ name: 'Trams', commandStation: 'D' }])
+      expect(cfg.jmri.value?.host).toBe('myhost')
+    })
+
+    it('stored jmri values override YAML defaults', async () => {
+      const stored = {
+        version: 1,
+        connections: { jmri: { host: 'override-host', port: 9999 } },
+        tabs: [],
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+      const cfg = await freshConfig()
+      expect(cfg.jmri.value?.host).toBe('override-host')
+      expect(cfg.jmri.value?.port).toBe(9999)
+    })
+
+    it('preserves homeassistant config from localStorage when YAML has none', async () => {
+      const stored = {
+        version: 1,
+        connections: {
+          jmri: { host: 'localhost', port: 12080 },
+          homeassistant: { url: 'http://ha.local:8123', token: 'abc' },
+        },
+        tabs: [],
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+      const cfg = await freshConfig()
+      expect(cfg.homeassistant.value?.url).toBe('http://ha.local:8123')
+    })
+  })
 })

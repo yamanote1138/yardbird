@@ -30,6 +30,23 @@ function migrateFromLayout(layoutConfig: ReturnType<typeof useLayout>): StoredCo
   }
 }
 
+// Merge YAML connection settings as defaults under stored values.
+// New YAML fields appear automatically; user-saved values are preserved.
+// Does NOT save back to localStorage — backfill is a read-time operation.
+function backfillConnections(
+  stored: StoredConfig['connections'],
+  yamlPlugins: ReturnType<typeof useLayout>['plugins']['value']
+): StoredConfig['connections'] {
+  const jmri = { ...yamlPlugins.jmri, ...stored.jmri } as JmriPluginConfig
+  const haBase = yamlPlugins.homeassistant
+  const haStored = stored.homeassistant
+  const homeassistant =
+    haBase !== undefined || haStored !== undefined
+      ? ({ ...haBase, ...haStored } as HomeAssistantPluginConfig)
+      : undefined
+  return { jmri, homeassistant }
+}
+
 function loadFromStorage(): StoredConfig | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
@@ -54,22 +71,27 @@ function saveToStorage(cfg: StoredConfig): void {
   }
 }
 
-async function init(): Promise<void> {
-  const stored = loadFromStorage()
-  if (stored) {
-    logger.info('[Config] Loaded from localStorage')
-    config.value = stored
-    loading.value = false
-    return
-  }
-
-  // Wait for YAML layout to finish loading (it triggers on module import)
+async function waitForLayout(): Promise<void> {
   await new Promise<void>(resolve => {
     if (!layout.loading.value) { resolve(); return }
     const interval = setInterval(() => {
       if (!layout.loading.value) { clearInterval(interval); resolve() }
     }, 20)
   })
+}
+
+async function init(): Promise<void> {
+  // Always wait for YAML — needed for backfill even when localStorage has a config
+  await waitForLayout()
+
+  const stored = loadFromStorage()
+  if (stored) {
+    stored.connections = backfillConnections(stored.connections, layout.plugins.value)
+    logger.info('[Config] Loaded from localStorage with YAML backfill')
+    config.value = stored
+    loading.value = false
+    return
+  }
 
   const migrated = migrateFromLayout(layout)
   logger.info('[Config] Migrated config from yardbird.yaml, saving to localStorage')
@@ -108,13 +130,13 @@ export function useConfig() {
   }
 
   return {
-    config:      computed(() => config.value),
-    loading:     computed(() => loading.value),
-    tabs:        computed(() => config.value?.tabs ?? []),
-    connections: computed(() => config.value?.connections ?? {}),
-    jmri:        computed(() => config.value?.connections.jmri),
+    config:        computed(() => config.value),
+    loading:       computed(() => loading.value),
+    tabs:          computed(() => config.value?.tabs ?? []),
+    connections:   computed(() => config.value?.connections ?? {}),
+    jmri:          computed(() => config.value?.connections.jmri),
     homeassistant: computed(() => config.value?.connections.homeassistant),
-    debug:       computed(() => config.value?.debug ?? false),
+    debug:         computed(() => config.value?.debug ?? false),
     save,
     saveTabs,
     saveConnections,
