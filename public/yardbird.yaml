@@ -1,42 +1,33 @@
-# YardBird configuration
-# Edit this file and restart the container to apply changes.
-
-debug: false  # Enable debug logging in the browser console
+# YardBird configuration template
+# Import this file via the YardBird setup screen to pre-fill your connection settings.
+# To use with Docker: volume-mount your edited copy to /config/yardbird.yaml
 
 plugins:
   jmri:
-    host: raspi-jmri.local
-    port: 12080
-    secure: false
-    # Set to true to use simulated data (no JMRI hardware required)
-    mock: true
-    tramPwmFreq: 3
-    # DC PWM frequency applied on acquire via F29/F30/F31:
-    # 0=131Hz (default), 1=490Hz (F29), 2=3.4kHz (F30), 3=Supersonic (F31)
+    host: ''                  # hostname or IP of your JMRI server
+    port: 12080               # default JMRI WebSocket port
+    # secure: false           # set true to use wss:// (requires TLS on JMRI)
+    # mock: false             # set true to run without hardware
 
-    # Roster groups: name must match a JMRI roster group exactly.
-    # commandStation routes per-zone power control to the right connection.
-    rosterGroups:
-      - name: Trams
-        commandStation: D
+    # Roster groups: name must match a JMRI roster group exactly (case-sensitive).
+    # commandStation routes per-zone power control to the right connection prefix.
+    # rosterGroups:
+    #   - name: trams
+    #     commandStation: D
 
-    # Power zone buttons shown in the header toolbar.
+    # Power zone buttons shown in the header.
     # Option 1 — explicit zones (prefix "" = default JMRI connection):
-    commandStations:
-      - name: DCC
-        prefix: "L"
-      - name: Trams
-        prefix: D
+    # commandStations:
+    #   - name: DCC
+    #     prefix: "L"
+    #   - name: Trams
+    #     prefix: D
     # Option 2 — auto-discover from JMRI system connections:
     # commandStations:
     #   discover: true
-    # Option 3 — single combined power button (omit commandStations entirely)
+    # Option 3 — omit commandStations for a single combined power button
 
-  homeassistant:
-    enabled: true
-    mock: true  # Set to false and provide url/token/area for real Home Assistant
-    url: http://homeassistant.local:8123
-    token: ''
-    area: train_room
-
-tabs: []
+  # homeassistant:
+  #   url: http://homeassistant.local:8123
+  #   token: ''          # long-lived access token
+  #   area: train_room   # filter entities by area
