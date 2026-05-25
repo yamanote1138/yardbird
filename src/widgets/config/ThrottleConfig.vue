@@ -30,7 +30,17 @@
     </div>
 
     <div v-if="allRoster.length > 0" class="space-y-2">
-      <p class="text-xs text-neutral-500">Or pick from roster:</p>
+      <div class="flex items-center justify-between">
+        <p class="text-xs text-neutral-500">Or pick from roster:</p>
+        <button
+          :disabled="isReloading || !isConnected"
+          class="text-neutral-500 hover:text-neutral-300 disabled:opacity-40 transition-colors"
+          title="Reload roster from JMRI"
+          @click="reloadRoster"
+        >
+          <UIcon name="i-mdi-refresh" class="w-3.5 h-3.5" :class="{ 'animate-spin': isReloading }" />
+        </button>
+      </div>
 
       <!-- Filter pills -->
       <div class="flex flex-wrap gap-1">
@@ -133,7 +143,19 @@ import type { RosterEntry } from '@/types/jmri'
 const props = defineProps<{ config: Record<string, unknown> }>()
 const emit = defineEmits<{ update: [config: Record<string, unknown>] }>()
 
-const { ungroupedRoster, groupedRoster, commandStations } = useJmri()
+const { ungroupedRoster, groupedRoster, commandStations, fetchRosterGroups, isConnected } = useJmri()
+
+const isReloading = ref(false)
+
+async function reloadRoster() {
+  if (isReloading.value || !isConnected.value) return
+  isReloading.value = true
+  try {
+    await fetchRosterGroups()
+  } finally {
+    isReloading.value = false
+  }
+}
 
 const activeFilter = ref<string>('__all__')
 
