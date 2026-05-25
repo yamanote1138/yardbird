@@ -28,13 +28,6 @@ describe('sanitize', () => {
     expect(sanitize(42)).toBeNull()
   })
 
-  it('strips deprecated tramPrefix silently', () => {
-    const raw = { version: 1, connections: { jmri: { host: 'h', port: 1, tramPrefix: 'D' } }, tabs: [] }
-    const result = sanitize(raw)
-    expect(result).not.toBeNull()
-    expect((result!.connections.jmri as any).tramPrefix).toBeUndefined()
-  })
-
   it('strips unknown top-level fields', () => {
     const raw = { version: 1, connections: { jmri: { host: 'h', port: 1 } }, tabs: [], unknown: 'field' }
     const result = sanitize(raw)
@@ -62,20 +55,6 @@ tabs: []
     expect(config).not.toBeNull()
     expect(config!.connections.jmri?.host).toBe('myhost')
     expect(warnings).toHaveLength(0)
-  })
-
-  it('returns a warning for deprecated tramPrefix', () => {
-    const yaml = `
-plugins:
-  jmri:
-    host: myhost
-    port: 12080
-    tramPrefix: D
-tabs: []
-`
-    const { config, warnings } = importYaml(yaml)
-    expect(config).not.toBeNull()
-    expect(warnings.some(w => w.includes('tramPrefix'))).toBe(true)
   })
 
   it('returns null config when jmri host is missing', () => {

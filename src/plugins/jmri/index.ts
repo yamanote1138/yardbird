@@ -802,7 +802,6 @@ export function useJmri() {
     }
 
     // Create a synthetic roster entry for addresses not in the JMRI roster
-    // (common for tram addresses on a DCC++ sub-connection)
     if (!jmriState.value.roster.has(address)) {
       logger.info(`No roster entry for address ${address} — creating synthetic entry`)
       jmriState.value.roster.set(address, {

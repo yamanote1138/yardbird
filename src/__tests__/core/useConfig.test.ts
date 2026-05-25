@@ -57,16 +57,6 @@ describe('useConfig', () => {
       expect(tabs.value[0].id).toBe('stored-tab')
     })
 
-    it('strips deprecated tramPrefix from jmri config on load', async () => {
-      const stored = {
-        version: 1,
-        connections: { jmri: { host: 'localhost', port: 12080, tramPrefix: 'D' } },
-        tabs: [],
-      }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
-      const { jmri } = await freshConfig()
-      expect((jmri.value as any)?.tramPrefix).toBeUndefined()
-    })
   })
 
   describe('save', () => {

@@ -19,7 +19,6 @@ export interface JmriPluginConfig {
   port: number
   secure?: boolean
   mock?: boolean
-  tramPwmFreq?: number
   commandStations?: CommandStationsConfig
   rosterGroups?: RosterGroupConfig[]
 }

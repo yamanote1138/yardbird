@@ -281,7 +281,6 @@ function saveJmri() {
     secure:          !!jmriForm.secure,
     mock:            !!jmriForm.mock,
     commandStations: jmri.value?.commandStations,
-    tramPwmFreq:     jmri.value?.tramPwmFreq,
     rosterGroups:    jmri.value?.rosterGroups,
   }
   cfg.saveConnections({ ...cfg.connections.value, jmri: updated })

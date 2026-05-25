@@ -27,10 +27,8 @@ export function sanitize(raw: unknown): StoredConfig | null {
     port: typeof rj.port === 'number' ? rj.port : 12080,
     ...(typeof rj.secure === 'boolean' && { secure: rj.secure }),
     ...(typeof rj.mock === 'boolean' && { mock: rj.mock }),
-    ...(typeof rj.tramPwmFreq === 'number' && { tramPwmFreq: rj.tramPwmFreq }),
     ...(Array.isArray(rj.commandStations) && { commandStations: rj.commandStations as CommandStationsConfig }),
     ...(Array.isArray(rj.rosterGroups) && { rosterGroups: rj.rosterGroups as RosterGroupConfig[] }),
-    // tramPrefix intentionally omitted — deprecated, silently dropped
   }
 
   let homeassistant: HomeAssistantPluginConfig | undefined
@@ -79,11 +77,6 @@ export function importYaml(text: string): { config: StoredConfig | null; warning
 
   const raw = parsed as Record<string, unknown>
   const plugins = raw.plugins as Record<string, unknown> | undefined
-  const jmriPlugin = plugins?.jmri as Record<string, unknown> | undefined
-
-  if (jmriPlugin && 'tramPrefix' in jmriPlugin) {
-    warnings.push('tramPrefix is no longer supported and was ignored')
-  }
 
   const normalized: Record<string, unknown> = {
     version: 1,

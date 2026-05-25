@@ -63,7 +63,6 @@ src/
 │   │       ├── ThrottleList.vue, ThrottleCard.vue
 │   │       ├── TurnoutList.vue, TurnoutWidget.vue  (single-item widget)
 │   │       ├── LightList.vue, LightWidget.vue      (single-item widget)
-│   │       ├── TramWidget.vue
 │   │       └── RosterCard.vue, LocomotiveHeader.vue
 │   └── homeassistant/
 │       ├── index.ts                — useHomeAssistant composable (singleton)
@@ -107,17 +106,9 @@ public/
    - `saveConnections()` also works when `needsSetup` (config is null) — creates a fresh config
    - `reset()` clears localStorage and sets `needsSetup = true`
 
-4. **Tram Throttle Behaviour**
-   - Tram addresses 30 (inner loop) and 31 (outer loop) are filtered from the main JMRI loco roster
-   - Controlled entirely through JMRI — no separate protocol, no proxy
-   - Optional `tramPrefix` in YAML routes acquisition to a specific JMRI system connection (e.g. `D` for DCC++)
-   - If tram addresses are not in the JMRI roster, a synthetic entry is created automatically on acquire
-   - On acquire: DC PWM frequency is set via JMRI throttle functions after a 500ms delay:
-     - F29=on → ~490 Hz, F30=on → ~3.4 kHz, F31=on → Supersonic, all off → 131 Hz (default)
-     - Must be at speed=0 (which it always is on acquire)
-   - `tramPwmFreq` in YAML sets the default frequency index (default: 3 = Supersonic)
-   - Release: speed set to 0 then throttle released; all trams auto-released when JMRI power goes off
-   - PWM frequency label shown in parentheses in the sublabel (e.g. "Inner Loop (Supersonic)")
+4. **Throttle Acquire**
+   - If an address is not in the JMRI roster, a synthetic entry is created automatically on acquire
+   - Throttles are released with speed set to 0 first; all throttles auto-released when JMRI power goes off
 
 5. **Power Zones**
    - `powerZones` in YAML defines per-connection power buttons; three modes: explicit array, `discover: true`, or omit for single button
@@ -163,8 +154,7 @@ interface StoredConfig {
   tabs: TabConfig[]   // TabConfig now includes widgets: WidgetInstance[]
 }
 
-type WidgetType = 'jmri-power' | 'jmri-throttle' | 'jmri-turnout'
-                | 'jmri-light' | 'jmri-tram'     | 'ha-entity'
+type WidgetType = 'jmri-power' | 'jmri-throttle' | 'jmri-turnout' | 'jmri-light' | 'ha-entity'
 
 interface WidgetInstance {
   id: string                        // crypto.randomUUID()
@@ -216,8 +206,6 @@ Config lives entirely in `localStorage` key `yardbird:config` (a `StoredConfig` 
 **In development:** `public/yardbird.yaml` is a blank template — edit it to test the Docker banner, or just fill in the setup form.
 
 **Config notes:**
-- `tramPrefix` — **deprecated**, silently stripped on load/import; ignored
-- `tramPwmFreq` — default DC PWM frequency index: 0=131Hz, 1=490Hz, 2=3.4kHz, 3=Supersonic (default 3)
 - `commandStations` — array of `{name, prefix}`, or `{discover: true}`, or omit for single button
 
 ## Development Conventions
@@ -226,7 +214,7 @@ Config lives entirely in `localStorage` key `yardbird:config` (a `StoredConfig` 
 - `<script setup>` syntax, Composition API only
 - `@/` import alias for all `src/` imports — no relative `../../` paths
 - Use `logger.debug/info/warn/error` from `@/utils/logger` — no direct `console.log`
-- Debug output only shown when `debug: true` in `yardbird.yaml`
+- Debug output only shown when `debug: true` in connection settings
 
 ### Component Organisation
 ```
@@ -315,7 +303,7 @@ npm run type-check   # TypeScript check only
 ```
 
 ### Testing Without Hardware
-Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
+Set `mock: true` in the JMRI connection config on the setup screen.
 
 ## JMRI Integration Notes
 
@@ -323,11 +311,11 @@ Set `mock: true` in the `jmri` plugin config in `yardbird.yaml`.
 - **Throttles**: created on-demand by DCC address; stored in Map
 - **Lights**: LCC-based, independent of DCC power; fetched on connect via `listLights()`
 - **Power zones**: `getSystemConnections()` is only called when `discover: true` — avoid calling it unconditionally as it can time out on some JMRI versions
-- **DCC-EX reconnect**: if JMRI loses its connection to DCC-EX (e.g. command station power-cycled), JMRI does NOT auto-reconnect — restart JMRI to restore. Trams power zone shows UNKNOWN in this state.
+- **DCC-EX reconnect**: if JMRI loses its connection to DCC-EX (e.g. command station power-cycled), JMRI does NOT auto-reconnect — restart JMRI to restore. Affected power zones show UNKNOWN in this state.
 
 ## Troubleshooting
 
-**Trams won't acquire / wrong hardware**
+**Throttle won't acquire / wrong hardware**
 - Ensure `commandStation` in the JMRI connection config matches the DCC-EX prefix in JMRI Preferences → Connections
 - Enable `debug: true` in the connection settings and check the browser console for acquisition errors
 
