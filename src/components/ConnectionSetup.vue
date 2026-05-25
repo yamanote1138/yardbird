@@ -2,7 +2,8 @@
   <div class="min-h-screen bg-neutral-950 text-white flex flex-col items-center justify-center">
     <div class="text-center max-w-sm w-full px-6">
       <img src="/favicon.svg" class="w-16 h-16 md:w-20 md:h-20 mx-auto mb-6" alt="YardBird" />
-      <h1 class="text-3xl md:text-4xl font-bold mb-2">YardBird</h1>
+      <h1 class="text-3xl md:text-4xl font-bold mb-1">YardBird</h1>
+      <p class="text-xs text-neutral-500 mb-2">v{{ version }}</p>
       <p class="text-neutral-400 md:text-lg mb-8">Your customizable layout control panel</p>
 
       <!-- Connection cards -->
@@ -151,6 +152,7 @@
 import { ref, computed, reactive } from 'vue'
 import { useConfig } from '@/core/useConfig'
 import type { JmriPluginConfig, HomeAssistantPluginConfig } from '@/core/types'
+import { version } from '../../package.json'
 
 const emit = defineEmits<{
   connect: []
