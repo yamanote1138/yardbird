@@ -18,7 +18,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 22+** required
 
 ### Current Version
-v8.0.0 — Visual configurator release. Vite 8, TypeScript 6, @vitejs/plugin-vue 6
+v8.3.1 — Dynamic roster groups, YAML import/export, component test suite
 
 ## User Context & Preferences
 
@@ -249,9 +249,25 @@ Config lives entirely in `localStorage` key `yardbird:config` (a `StoredConfig` 
 - **`vi.waitFor()`**: use as `vi.waitFor(fn, opts)` — it is NOT a standalone named export from vitest
 - **Test files**: `src/__tests__/<layer>/<module>.test.ts` mirroring `src/` structure
 
-### Future Component Tests
+### Component Tests
 
-Vue component tests (`.vue` files) will use `@vue/test-utils` with `mount`. These require Nuxt UI and Tailwind stubs; not yet implemented. Until then, test logic at the composable layer.
+Vue component tests use `@vue/test-utils` with `mount`. Global Nuxt UI stubs are configured in `src/__tests__/setup.ts` (loaded via `vitest.config.ts` `setupFiles`). Use the helpers from `src/__tests__/test-utils.ts`:
+
+- **`mountWithUI(component, options?)`** — mounts with global stubs pre-applied; per-test stubs merge on top
+- **`connectMockJmri()`** — initializes the JMRI mock client and waits for `CONNECTED` state; returns the `useJmri()` object
+
+**Global stubs** (`src/__tests__/setup.ts`): UButton, UIcon, UInput, UCheckbox, UModal, UCard, UAlert, UToaster — all render minimal HTML that exposes `$attrs`, slots, and testable attributes like `data-icon="..."` and `disabled`.
+
+**Key patterns:**
+- `useConfig` tests: mock with `vi.mock('@/core/useConfig', () => ({ useConfig: () => ({...}) }))` — provide only the fields the component uses
+- `useJmri` state: mutate `jmriState.value.xxx` directly (module-scope ref) after `connectMockJmri()`
+- `useHomeAssistant` state: call `useHomeAssistant().connectMock()` to seed 5 fixture entities (3 lights, 2 switches); `lights`/`switches` are read-only computed
+- `fetchRosterGroups()` re-throws errors — mock it in components that call it on mount: `vi.mock('@/plugins/jmri', async (importOriginal) => { const mod = await importOriginal(); return { ...mod, useJmri: () => ({ ...mod.useJmri(), fetchRosterGroups: vi.fn().mockResolvedValue(undefined) }) } })`
+- `gridstack`: stub with `vi.mock('gridstack', () => ({ GridStack: { setupDragIn: vi.fn() } }))`
+- `VueDraggable` (TabManager): stub per-test with `{ props: ['modelValue'], emits: ['update:modelValue', 'end'], template: '<ul><slot /></ul>' }`
+- `ConnectionSetup` fetch: set `global.fetch = vi.fn().mockResolvedValue({ ok: false })` to suppress the Docker banner fetch
+
+**Icon assertions**: UIcon stub renders `<span :data-icon="name" />` — assert with `wrapper.find('[data-icon="i-mdi-..."]').exists()`
 
 ## Git Conventions
 
@@ -338,6 +354,10 @@ Set `mock: true` in the JMRI connection config on the setup screen.
 
 All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
+## Component Test Suite — Complete
+
+26 test files, 159 tests covering all components except TabCanvas and App.vue (Gridstack/DOM-heavy). Infrastructure: `src/__tests__/setup.ts` + `src/__tests__/test-utils.ts`. See the **Component Tests** section above for patterns.
+
 - [x] **Phase 1** — Config persistence layer: `src/core/types.ts`, `src/core/useConfig.ts`, update `App.vue`
 - [x] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts`, edit button in header
 - [x] **Phase 3** — Widget registry + WidgetFrame: `src/widgets/registry.ts`, `src/widgets/WidgetFrame.vue`, `TurnoutWidget.vue`, `LightWidget.vue`
@@ -357,4 +377,4 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
 ---
 
-*Last updated: May 2026 — v8.0.0*
+*Last updated: May 2026 — v8.3.1*
