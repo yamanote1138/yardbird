@@ -1,3 +1,39 @@
+# Throttle Roster Filter Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add roster group pill-button filter to the throttle config dialog so users can narrow the loco list to a specific group.
+
+**Architecture:** Single file change — `src/widgets/config/ThrottleConfig.vue`. Add an `activeFilter` ref (sentinel strings `'__all__'`, `'__ungrouped__'`, or a group name) and a pill row above the roster. The existing grouped-sections layout renders under `'__all__'`; named-group and `'__ungrouped__'` views render flat lists.
+
+**Tech Stack:** Vue 3 Composition API, `useJmri()` composable (already provides `groupedRoster`, `ungroupedRoster`), Tailwind CSS 4, no new dependencies.
+
+---
+
+## Files
+
+- **Modify:** `src/widgets/config/ThrottleConfig.vue`
+
+No other files are touched. `useJmri` already exposes everything needed.
+
+---
+
+## Note on Testing
+
+`ThrottleConfig.vue` is a Vue component that depends on Nuxt UI (`UInput`). Component tests require Nuxt UI stubs not yet wired into Vitest (see CLAUDE.md "Future Component Tests"). Skip automated tests; verify manually in the running app.
+
+---
+
+### Task 1: Add roster filter pills to ThrottleConfig.vue
+
+**Files:**
+- Modify: `src/widgets/config/ThrottleConfig.vue`
+
+- [ ] **Step 1: Replace the file with the updated implementation**
+
+The full replacement for `src/widgets/config/ThrottleConfig.vue`:
+
+```vue
 <template>
   <div class="space-y-3">
     <div>
@@ -180,3 +216,40 @@ watch([selectedAddress, selectedCommandStation], ([addr, cs]) => {
   emit('update', { address: addr, commandStation: cs })
 }, { immediate: true })
 </script>
+```
+
+- [ ] **Step 2: Verify the build passes**
+
+```bash
+npm run type-check
+```
+
+Expected: no errors.
+
+- [ ] **Step 3: Run the test suite to confirm no regressions**
+
+```bash
+npm test
+```
+
+Expected: `61 passed (61)` — no new failures (ThrottleConfig has no automated tests).
+
+- [ ] **Step 4: Manual verification checklist**
+
+Start the dev server (`npm run dev`), open the app in mock mode (`mock: true` in `public/yardbird.yaml`), and connect. In edit mode, add a throttle widget and open its config dialog:
+
+| Scenario | Expected |
+|---|---|
+| No roster groups configured | Pill row shows only `All` (active); ungrouped entries shown below |
+| Roster groups configured | Pills: `All` · `<group names>` · `Ungrouped` (if ungrouped entries exist) |
+| Click a group pill | Only that group's entries shown; "None connected" if group is empty |
+| Click `Ungrouped` pill | Only ungrouped entries shown |
+| Click `All` pill | Returns to grouped-sections layout |
+| Select a loco from any view | Address field populates; loco button highlights blue |
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add src/widgets/config/ThrottleConfig.vue
+git commit -m "Add roster group filter pills to throttle config dialog"
+```
