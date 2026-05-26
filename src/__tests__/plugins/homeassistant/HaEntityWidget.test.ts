@@ -47,4 +47,28 @@ describe('HaEntityWidget', () => {
     // entity not found → shows p tag, no button
     expect(wrapper.find('button').exists()).toBe(false)
   })
+
+  it('shows bolt icon when switch entity is on', () => {
+    useHomeAssistant().connectMock()
+    const wrapper = mountWithUI(HaEntityWidget, {
+      props: { entityId: 'switch.layout_power_strip' },
+    })
+    expect(wrapper.find('[data-icon="i-heroicons-bolt"]').exists()).toBe(true)
+  })
+
+  it('shows bolt-slash icon when switch entity is off', () => {
+    useHomeAssistant().connectMock()
+    const wrapper = mountWithUI(HaEntityWidget, {
+      props: { entityId: 'switch.camera' },
+    })
+    expect(wrapper.find('[data-icon="i-heroicons-bolt-slash"]').exists()).toBe(true)
+  })
+
+  it('shows button when entity exists and HA is connected', () => {
+    useHomeAssistant().connectMock()
+    const wrapper = mountWithUI(HaEntityWidget, {
+      props: { entityId: 'switch.camera' },
+    })
+    expect(wrapper.find('button').exists()).toBe(true)
+  })
 })

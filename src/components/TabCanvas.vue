@@ -47,6 +47,7 @@ import { getWidgetDef } from '@/widgets/registry'
 import { draggingWidgetType, setDraggingType } from '@/widgets/dragState'
 import WidgetFrame from '@/widgets/WidgetFrame.vue'
 import type { TabConfig, WidgetInstance, WidgetType } from '@/core/types'
+import { generateId } from '@/utils/uuid'
 
 const props = defineProps<{ tab: TabConfig }>()
 
@@ -207,7 +208,7 @@ function handlePaletteDrop(node: GridStackNode) {
 
   const def = getWidgetDef(widgetType)
   const newWidget: WidgetInstance = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type: widgetType,
     grid: {
       x: node.x ?? 0,
@@ -264,7 +265,7 @@ function addWidgetOfType(type: WidgetType) {
     return Math.max(acc, (pos?.y ?? 0) + (pos?.h ?? 1))
   }, 0)
   const newWidget: WidgetInstance = {
-    id: crypto.randomUUID(),
+    id: generateId(),
     type,
     grid: { x: 0, y: maxY, w: def.defaultSize.w, h: def.defaultSize.h },
     config: {},
