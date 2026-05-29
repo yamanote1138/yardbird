@@ -17,61 +17,69 @@
       </LocomotiveHeader>
     </div>
 
-    <!-- Speed control -->
+    <!-- Speed control + direction/stop: responsive layout -->
     <div class="mb-2 sm:mb-3">
       <label class="text-sm mb-1 block text-neutral-300">Speed: {{ Math.round(throttle.speed * 100) }}%</label>
-      <div class="flex w-full gap-1 md:gap-1.5" role="group" aria-label="Speed control">
-        <button
-          v-for="(level, index) in powerLevels"
-          :key="level"
-          class="speed-segment flex-1 h-8 md:h-11 rounded transition-colors"
-          :class="getSpeedButtonClass(level, index)"
-          @click="setPowerLevel(level, index)"
-          :disabled="controlsDisabled"
-        >
-          &nbsp;
-        </button>
-      </div>
-    </div>
 
-    <!-- Direction and Stop buttons -->
-    <div class="flex w-full gap-1 md:gap-2 mb-2 sm:mb-3" role="group" aria-label="Direction and stop controls">
-      <UButton
-        class="flex-1"
-        :color="throttle.directionVerified ? 'primary' : 'warning'"
-        @click="toggleDirection"
-        :disabled="controlsDisabled"
-      >
-        <template #leading>
-          <UIcon v-if="!throttle.directionVerified" name="i-mdi-shuffle-variant" />
-          <UIcon v-else-if="throttle.direction" name="i-heroicons-arrow-right" />
-          <UIcon v-else name="i-heroicons-arrow-left" />
-        </template>
-        <span v-if="!throttle.directionVerified">Unknown</span>
-        <span v-else>{{ throttle.direction ? 'Forward' : 'Reverse' }}</span>
-      </UButton>
-      <UButton
-        class="flex-1"
-        color="warning"
-        @click="brakeThrottle"
-        :disabled="controlsDisabled"
-      >
-        <template #leading>
-          <UIcon name="i-mdi-gauge" />
-        </template>
-        Brake
-      </UButton>
-      <UButton
-        class="flex-1"
-        color="error"
-        @click="emergencyStop"
-        :disabled="controlsDisabled"
-      >
-        <template #leading>
-          <UIcon name="i-heroicons-stop-circle" />
-        </template>
-        E-Stop
-      </UButton>
+      <!-- Mobile: stacked (bar then controls). Desktop: side-by-side (bar | controls). -->
+      <div class="flex flex-col sm:flex-row sm:h-48 gap-2">
+
+        <!-- Speed bar: horizontal row on mobile, vertical column (bottom=slow) on desktop -->
+        <div
+          class="flex flex-row sm:flex-col-reverse gap-1 sm:gap-1.5 h-11 sm:h-full sm:w-10"
+          role="group"
+          aria-label="Speed control"
+        >
+          <button
+            v-for="(level, index) in powerLevels"
+            :key="level"
+            class="speed-segment flex-1 rounded transition-colors"
+            :class="getSpeedButtonClass(level, index)"
+            @click="setPowerLevel(level, index)"
+            :disabled="controlsDisabled"
+          >&nbsp;</button>
+        </div>
+
+        <!-- Controls: icon-only row on mobile, stacked labelled buttons on desktop -->
+        <div
+          class="flex flex-row sm:flex-col gap-1 sm:gap-2 sm:flex-1 sm:justify-end"
+          role="group"
+          aria-label="Direction and stop controls"
+        >
+          <UButton
+            class="flex-1 sm:flex-none sm:w-full"
+            :color="throttle.directionVerified ? 'primary' : 'warning'"
+            @click="toggleDirection"
+            :disabled="controlsDisabled"
+          >
+            <template #leading>
+              <UIcon v-if="!throttle.directionVerified" name="i-mdi-shuffle-variant" />
+              <UIcon v-else-if="throttle.direction" name="i-heroicons-arrow-right" />
+              <UIcon v-else name="i-heroicons-arrow-left" />
+            </template>
+            <span class="hidden sm:inline">{{ !throttle.directionVerified ? 'Unknown' : throttle.direction ? 'Forward' : 'Reverse' }}</span>
+          </UButton>
+          <UButton
+            class="flex-1 sm:flex-none sm:w-full"
+            color="warning"
+            @click="brakeThrottle"
+            :disabled="controlsDisabled"
+          >
+            <template #leading><UIcon name="i-heroicons-pause" /></template>
+            <span class="hidden sm:inline">Brake</span>
+          </UButton>
+          <UButton
+            class="flex-1 sm:flex-none sm:w-full"
+            color="error"
+            @click="emergencyStop"
+            :disabled="controlsDisabled"
+          >
+            <template #leading><UIcon name="i-heroicons-stop-circle" /></template>
+            <span class="hidden sm:inline">E-Stop</span>
+          </UButton>
+        </div>
+
+      </div>
     </div>
 
     <!-- Function buttons -->

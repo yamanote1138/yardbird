@@ -87,6 +87,13 @@ function initGrid() {
   grid = GridStack.init(
     {
       column: 12,
+      columnOpts: {
+        breakpointForWindow: true,
+        breakpoints: [
+          { w: 640, c: 4 },
+          { w: 1024, c: 8 },
+        ],
+      },
       cellHeight: 80,
       minRow: 3,
       handle: '.gs-drag-handle',
