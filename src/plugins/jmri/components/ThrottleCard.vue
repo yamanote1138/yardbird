@@ -17,16 +17,15 @@
       </LocomotiveHeader>
     </div>
 
-    <!-- Speed control + direction/stop: responsive layout -->
+    <!-- Speed control + direction/stop -->
     <div class="mb-2 sm:mb-3">
       <label class="text-sm mb-1 block text-neutral-300">Speed: {{ Math.round(throttle.speed * 100) }}%</label>
 
-      <!-- Mobile: stacked (bar then controls). Desktop: side-by-side (bar | controls). -->
-      <div class="flex flex-col sm:flex-row sm:h-48 gap-2">
+      <div class="flex flex-col gap-2">
 
-        <!-- Speed bar: horizontal row on mobile, vertical column (bottom=slow) on desktop -->
+        <!-- Speed bar: horizontal row of segments -->
         <div
-          class="flex flex-row sm:flex-col-reverse gap-1 sm:gap-1.5 h-11 sm:h-full sm:w-10"
+          class="flex flex-row gap-1 h-11"
           role="group"
           aria-label="Speed control"
         >
@@ -40,14 +39,14 @@
           >&nbsp;</button>
         </div>
 
-        <!-- Controls: icon-only row on mobile, stacked labelled buttons on desktop -->
+        <!-- Direction / brake / stop: icon-only row -->
         <div
-          class="flex flex-row sm:flex-col gap-1 sm:gap-2 sm:flex-1 sm:justify-end"
+          class="flex flex-row gap-1"
           role="group"
           aria-label="Direction and stop controls"
         >
           <UButton
-            class="flex-1 sm:flex-none sm:w-full"
+            class="flex-1"
             :color="throttle.directionVerified ? 'primary' : 'warning'"
             @click="toggleDirection"
             :disabled="controlsDisabled"
@@ -57,33 +56,53 @@
               <UIcon v-else-if="throttle.direction" name="i-heroicons-arrow-right" />
               <UIcon v-else name="i-heroicons-arrow-left" />
             </template>
-            <span class="hidden sm:inline">{{ !throttle.directionVerified ? 'Unknown' : throttle.direction ? 'Forward' : 'Reverse' }}</span>
+            <span class="hidden">{{ !throttle.directionVerified ? 'Unknown' : throttle.direction ? 'Forward' : 'Reverse' }}</span>
           </UButton>
           <UButton
-            class="flex-1 sm:flex-none sm:w-full"
+            class="flex-1"
             color="warning"
             @click="brakeThrottle"
             :disabled="controlsDisabled"
           >
             <template #leading><UIcon name="i-heroicons-pause" /></template>
-            <span class="hidden sm:inline">Brake</span>
+            <span class="hidden">Brake</span>
           </UButton>
           <UButton
-            class="flex-1 sm:flex-none sm:w-full"
+            class="flex-1"
             color="error"
             @click="emergencyStop"
             :disabled="controlsDisabled"
           >
             <template #leading><UIcon name="i-heroicons-stop-circle" /></template>
-            <span class="hidden sm:inline">E-Stop</span>
+            <span class="hidden">E-Stop</span>
           </UButton>
         </div>
 
       </div>
     </div>
 
-    <!-- Function buttons -->
-    <div v-if="functionButtons.length > 0" class="flex flex-wrap gap-1 md:gap-2" role="group">
+    <!-- DC loco PWM frequency buttons -->
+    <div v-if="isDcLoco" class="mt-2 sm:mt-3">
+      <label class="text-sm mb-1 block text-neutral-300">PWM Frequency</label>
+      <div class="flex gap-1 md:gap-2" role="group" aria-label="PWM frequency">
+        <UButton
+          v-for="pwm in PWM_BUTTONS"
+          :key="pwm.fn"
+          class="flex-1"
+          :color="activePwmFn === pwm.fn ? 'info' : 'neutral'"
+          :variant="activePwmFn === pwm.fn ? 'solid' : 'soft'"
+          @click="selectPwmFreq(pwm.fn)"
+          :disabled="controlsDisabled"
+          :title="pwm.label"
+        >
+          <template #leading><UIcon :name="pwm.icon" /></template>
+          <span class="hidden sm:inline">{{ pwm.label }}</span>
+        </UButton>
+      </div>
+    </div>
+
+    <!-- Standard function buttons -->
+    <div v-else-if="functionButtons.length > 0" class="flex flex-wrap gap-1 md:gap-2" role="group">
       <UButton
         v-for="fn in functionButtons"
         :key="fn.key"
@@ -115,6 +134,14 @@ const props = defineProps<{
   throttle: Throttle
 }>()
 
+const DC_LOCO_ADDRESSES = [30, 31, 32]
+
+const PWM_BUTTONS = [
+  { fn: 29, label: 'Default', icon: 'i-heroicons-signal' },
+  { fn: 30, label: 'High Freq', icon: 'i-heroicons-bolt' },
+  { fn: 31, label: 'Supersonic', icon: 'i-mdi-rocket-launch' },
+] as const
+
 const { isConnected, power, setThrottleSpeed, setThrottleDirection, setThrottleFunction, releaseThrottle } = useJmri()
 
 const isReleasing = ref(false)
@@ -129,6 +156,15 @@ const RAMP_TIME_PER_SEGMENT = 2000 // 2 seconds per segment
 // Disable controls when not connected or power is off
 const controlsDisabled = computed(() => {
   return !isConnected.value || power.value !== PowerState.ON
+})
+
+const isDcLoco = computed(() => DC_LOCO_ADDRESSES.includes(props.throttle.address))
+
+const activePwmFn = computed(() => {
+  for (const { fn } of PWM_BUTTONS) {
+    if (props.throttle.functions[`F${fn}`]?.value) return fn
+  }
+  return null
 })
 
 /**
@@ -284,6 +320,16 @@ async function brakeThrottle() {
 function emergencyStop() {
   stopFlag.value = true
   setThrottleSpeed(props.throttle.address, 0)
+}
+
+async function selectPwmFreq(fn: number) {
+  if (activePwmFn.value === fn) return
+  for (const { fn: f } of PWM_BUTTONS) {
+    if (props.throttle.functions[`F${f}`]?.value) {
+      await setThrottleFunction(props.throttle.address, f, false)
+    }
+  }
+  await setThrottleFunction(props.throttle.address, fn, true)
 }
 
 function toggleFunction(functionKey: string) {

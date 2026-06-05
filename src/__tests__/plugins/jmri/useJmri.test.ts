@@ -137,6 +137,28 @@ describe('useJmri', () => {
       expect(jmriState.value.roster.has(99)).toBe(true)
       expect(jmriState.value.roster.get(99)?.name).toBe('Address 99')
     })
+
+    it('sets F31 on acquire for DC loco addresses', async () => {
+      const { acquireThrottle, jmriState } = await connectMock()
+      await acquireThrottle(32)
+      await vi.waitFor(() => {
+        expect(jmriState.value.throttles.get(32)?.functions['F31']?.value).toBe(true)
+      }, { timeout: 1000 })
+    })
+
+    it('does not set F31 on acquire for standard addresses', async () => {
+      const { acquireThrottle, jmriState } = await connectMock()
+      await acquireThrottle(3)
+      expect(jmriState.value.throttles.get(3)?.functions['F31']?.value).not.toBe(true)
+    })
+
+    it('setThrottleFunction accepts F29+ without throwing', async () => {
+      const { acquireThrottle, setThrottleFunction } = await connectMock()
+      await acquireThrottle(32)
+      await expect(setThrottleFunction(32, 29, true)).resolves.not.toThrow()
+      await expect(setThrottleFunction(32, 30, false)).resolves.not.toThrow()
+      await expect(setThrottleFunction(32, 31, true)).resolves.not.toThrow()
+    })
   })
 
   describe('roster groups', () => {

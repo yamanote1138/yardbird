@@ -11,14 +11,14 @@ This file contains project conventions, architecture decisions, and development 
 - **Vite** for fast development and building
 - **Nuxt UI 4** + **Tailwind CSS 4** for responsive UI components
 - **Iconify** (Material Design Icons + Heroicons) for icons
-- **jmri-client 4.2+** for WebSocket-based JMRI communication (includes connection prefix support)
+- **jmri-client 5.2+** for WebSocket-based JMRI communication (includes connection prefix support; F29–F68 support added in 5.2.0)
 - **js-yaml** for YAML import/export (`useYamlConfig.ts`)
 - **gridstack** for drag-and-drop / resize dashboard grid (widget canvas)
 - **vue-draggable-plus** (SortableJS) for tab reordering in edit mode
 - **Node.js 22+** required
 
 ### Current Version
-v8.3.1 — Dynamic roster groups, YAML import/export, component test suite
+v8.5.0 — DC loco PWM frequency control, extended throttle function support (F29+)
 
 ## User Context & Preferences
 
@@ -328,6 +328,7 @@ Set `mock: true` in the JMRI connection config on the setup screen.
 - **Lights**: LCC-based, independent of DCC power; fetched on connect via `listLights()`
 - **Power zones**: `getSystemConnections()` is only called when `discover: true` — avoid calling it unconditionally as it can time out on some JMRI versions
 - **DCC-EX reconnect**: if JMRI loses its connection to DCC-EX (e.g. command station power-cycled), JMRI does NOT auto-reconnect — restart JMRI to restore. Affected power zones show UNKNOWN in this state.
+- **DC loco PWM control (addresses 30–32)**: DCC-EX DC mode locos use F29/F30/F31 to set PWM frequency (Default/High Freq/Supersonic). `ThrottleCard` shows dedicated mutually exclusive PWM buttons instead of standard function buttons for these addresses; F31 (Supersonic) is set automatically on acquire. Requires jmri-client 5.2+ for F29+ support.
 
 ## Troubleshooting
 
@@ -377,4 +378,4 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
 ---
 
-*Last updated: May 2026 — v8.3.1*
+*Last updated: June 2026 — v8.5.0*

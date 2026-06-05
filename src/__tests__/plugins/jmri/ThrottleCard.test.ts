@@ -86,4 +86,105 @@ describe('ThrottleCard', () => {
     const disabledButtons = buttons.filter(b => b.attributes('disabled') !== undefined)
     expect(disabledButtons.length).toBeGreaterThan(0)
   })
+
+  describe('PWM frequency buttons (DC locos)', () => {
+    it('shows PWM section for address 30', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: { throttle: makeThrottle({ address: 30 }) },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      expect(wrapper.text()).toContain('PWM Frequency')
+      expect(wrapper.text()).toContain('Default')
+      expect(wrapper.text()).toContain('High Freq')
+      expect(wrapper.text()).toContain('Supersonic')
+    })
+
+    it('shows PWM section for address 31', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: { throttle: makeThrottle({ address: 31 }) },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      expect(wrapper.text()).toContain('PWM Frequency')
+    })
+
+    it('shows PWM section for address 32', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: { throttle: makeThrottle({ address: 32 }) },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      expect(wrapper.text()).toContain('PWM Frequency')
+    })
+
+    it('does not show PWM section for a standard loco address', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: { throttle: makeThrottle({ address: 3 }) },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      expect(wrapper.text()).not.toContain('PWM Frequency')
+    })
+
+    it('suppresses standard function buttons for DC locos', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: {
+          throttle: makeThrottle({
+            address: 32,
+            functions: { F0: { label: 'Headlight', value: true, lockable: false } },
+          }),
+        },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      expect(wrapper.text()).not.toContain('Headlight')
+      expect(wrapper.text()).toContain('PWM Frequency')
+    })
+
+    it('highlights the active PWM button when F29 is on', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: {
+          throttle: makeThrottle({
+            address: 32,
+            functions: { F29: { label: 'Default', value: true, lockable: false } },
+          }),
+        },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      const buttons = wrapper.findAll('button')
+      const defaultBtn = buttons.find(b => b.text().includes('Default'))
+      expect(defaultBtn?.attributes('color')).toBe('info')
+    })
+
+    it('highlights the active PWM button when F31 is on', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: {
+          throttle: makeThrottle({
+            address: 32,
+            functions: { F31: { label: 'Supersonic', value: true, lockable: false } },
+          }),
+        },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      const buttons = wrapper.findAll('button')
+      const supersonicBtn = buttons.find(b => b.text().includes('Supersonic'))
+      expect(supersonicBtn?.attributes('color')).toBe('info')
+    })
+
+    it('no PWM button is highlighted when none are active', async () => {
+      await connectMockJmri()
+      const wrapper = mountWithUI(ThrottleCard, {
+        props: { throttle: makeThrottle({ address: 32, functions: {} }) },
+        global: { stubs: { LocomotiveHeader: LOCO_STUB } },
+      })
+      const buttons = wrapper.findAll('button')
+      const pwmButtons = buttons.filter(b =>
+        b.text().includes('Default') || b.text().includes('High Freq') || b.text().includes('Supersonic')
+      )
+      pwmButtons.forEach(b => expect(b.attributes('color')).not.toBe('info'))
+    })
+  })
 })

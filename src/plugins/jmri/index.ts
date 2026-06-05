@@ -843,6 +843,10 @@ export function useJmri() {
       }
       jmriState.value.throttles.set(address, throttle)
 
+      if ([30, 31, 32].includes(address)) {
+        await setThrottleFunction(address, 31, true)
+      }
+
       // After a short yield, read any function states JMRI sent as unsolicited
       // updates following acquisition. jmri-client stores these in its internal
       // throttle cache via the throttle:updated event; we sync them into our state.
@@ -859,8 +863,10 @@ export function useJmri() {
         for (const [key, value] of fnMap.entries()) {
           if (updatedFunctions[key]) {
             updatedFunctions[key] = { ...updatedFunctions[key], value: !!value }
-            anyUpdated = true
+          } else {
+            updatedFunctions[key] = { value: !!value, label: key, lockable: false }
           }
+          anyUpdated = true
         }
 
         if (anyUpdated) {

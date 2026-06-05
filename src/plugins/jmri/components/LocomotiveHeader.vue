@@ -105,12 +105,6 @@ function onImageError() {
   }
 }
 
-@media (min-width: 992px) {
-  .loco-thumbnail {
-    width: 200px;
-    height: 200px;
-  }
-}
 
 .loco-header:hover:not(.disabled) .loco-thumbnail {
   transform: scale(1.05);
