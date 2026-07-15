@@ -62,7 +62,7 @@ docker compose -f compose.dev.yaml up --build   # http://localhost:5173
 
 ## Local development
 
-**Requirements:** Node.js 22+
+**Requirements:** Node.js 24+
 
 ```bash
 npm install

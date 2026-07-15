@@ -15,7 +15,7 @@ This file contains project conventions, architecture decisions, and development 
 - **js-yaml** for YAML import/export (`useYamlConfig.ts`)
 - **gridstack** for drag-and-drop / resize dashboard grid (widget canvas)
 - **vue-draggable-plus** (SortableJS) for tab reordering in edit mode
-- **Node.js 22+** required
+- **Node.js 24+** required
 
 ### Current Version
 v8.5.0 — DC loco PWM frequency control, extended throttle function support (F29+)
@@ -297,7 +297,7 @@ GitHub Actions builds and pushes the Docker image on tag push.
 
 ## Docker
 
-- Multi-stage Dockerfile: Node 22 Alpine builder → Node 22 Alpine + Caddy production
+- Multi-stage Dockerfile: Node 24 Alpine builder → Node 24 Alpine + Caddy production
 - Multi-platform: linux/amd64 and linux/arm64
 - Image: `yamanote1138/yardbird`
 
