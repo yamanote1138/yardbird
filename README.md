@@ -2,6 +2,12 @@
   <img src="public/favicon.svg" width="96" alt="YardBird" />
   <h1>YardBird</h1>
   <p>A drag-and-drop layout control panel for model railroads.</p>
+
+  [![CI](https://github.com/yamanote1138/yardbird/actions/workflows/ci.yml/badge.svg)](https://github.com/yamanote1138/yardbird/actions/workflows/ci.yml)
+  ![Vue](https://img.shields.io/badge/-Vue_3-4FC08D?logo=vuedotjs&logoColor=white)
+  ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white)
+  ![Vite](https://img.shields.io/badge/-Vite-646CFF?logo=vite&logoColor=white)
+  ![Tailwind CSS](https://img.shields.io/badge/-Tailwind_CSS-06B6D4?logo=tailwindcss&logoColor=white)
 </div>
 
 ---
