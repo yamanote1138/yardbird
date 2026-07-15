@@ -16,8 +16,8 @@
 YardBird is a pure frontend SPA that connects directly to your layout hardware — no backend server, no database. Build your control panel visually: create tabs, drag widgets onto a grid, and configure each one. Your layout is saved locally and can be exported as a YAML file.
 
 <p align="center">
+  <img src="docs/screenshots/setup-screen.png" width="49%" alt="YardBird connection setup screen" />
   <img src="docs/screenshots/dashboard.png" width="49%" alt="YardBird dashboard — throttles, turnouts, and lights" />
-  <img src="docs/screenshots/edit-mode.png" width="49%" alt="YardBird visual dashboard editor" />
 </p>
 
 ## Features
