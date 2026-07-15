@@ -4,6 +4,7 @@
   <p>A drag-and-drop layout control panel for model railroads.</p>
 
   [![CI](https://github.com/yamanote1138/yardbird/actions/workflows/ci.yml/badge.svg)](https://github.com/yamanote1138/yardbird/actions/workflows/ci.yml)
+  [![Docker Pulls](https://img.shields.io/docker/pulls/yamanote1138/yardbird?logo=docker&logoColor=white)](https://hub.docker.com/r/yamanote1138/yardbird)
   ![Vue](https://img.shields.io/badge/-Vue_3-4FC08D?logo=vuedotjs&logoColor=white)
   ![TypeScript](https://img.shields.io/badge/-TypeScript-3178C6?logo=typescript&logoColor=white)
   ![Vite](https://img.shields.io/badge/-Vite-646CFF?logo=vite&logoColor=white)
@@ -13,6 +14,11 @@
 ---
 
 YardBird is a pure frontend SPA that connects directly to your layout hardware — no backend server, no database. Build your control panel visually: create tabs, drag widgets onto a grid, and configure each one. Your layout is saved locally and can be exported as a YAML file.
+
+<p align="center">
+  <img src="docs/screenshots/dashboard.png" width="49%" alt="YardBird dashboard — throttles, turnouts, and lights" />
+  <img src="docs/screenshots/edit-mode.png" width="49%" alt="YardBird visual dashboard editor" />
+</p>
 
 ## Features
 
