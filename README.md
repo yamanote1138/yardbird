@@ -16,8 +16,7 @@
 YardBird is a pure frontend SPA that connects directly to your layout hardware — no backend server, no database. Build your control panel visually: create tabs, drag widgets onto a grid, and configure each one. Your layout is saved locally and can be exported as a YAML file.
 
 <p align="center">
-  <img src="docs/screenshots/setup-screen.png" width="49%" alt="YardBird connection setup screen" />
-  <img src="docs/screenshots/dashboard.png" width="49%" alt="YardBird dashboard — throttles, turnouts, and lights" />
+  <img src="docs/screenshots/dashboard.png" width="70%" alt="YardBird dashboard — throttles, turnouts, and lights" />
 </p>
 
 ## Features
@@ -62,17 +61,6 @@ See [docs/configuration.md](docs/configuration.md) for the full YAML schema, wid
 ## Architecture
 
 See [docs/architecture.md](docs/architecture.md) for the plugin system, config flow, Gridstack canvas details, and how to add new widget types.
-
-## Tech Stack
-
-| | |
-|---|---|
-| [Vue 3](https://vuejs.org/) + TypeScript | Composition API throughout |
-| [Vite](https://vitejs.dev/) | Dev server and build tool |
-| [Nuxt UI 4](https://ui.nuxt.com/) + [Tailwind CSS 4](https://tailwindcss.com/) | UI components and styling |
-| [Gridstack](https://gridstackjs.com/) | Drag-and-drop grid canvas |
-| [jmri-client](https://www.npmjs.com/package/jmri-client) | JMRI WebSocket communication |
-| [js-yaml](https://github.com/nodeca/js-yaml) | Config file parsing and export |
 
 ## License
 
