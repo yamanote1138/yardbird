@@ -1,4 +1,4 @@
-import yaml from 'js-yaml'
+import { load, dump } from 'js-yaml'
 import type {
   StoredConfig, TabConfig, JmriPluginConfig, HomeAssistantPluginConfig,
   CommandStationsConfig,
@@ -65,7 +65,7 @@ export function importYaml(text: string): { config: StoredConfig | null; warning
 
   let parsed: unknown
   try {
-    parsed = yaml.load(text)
+    parsed = load(text)
   } catch (e) {
     return { config: null, warnings: [`Failed to parse YAML: ${String(e)}`] }
   }
@@ -105,5 +105,5 @@ export function exportYaml(config: StoredConfig): string {
     ...(config.connections.homeassistant && { homeassistant: config.connections.homeassistant }),
   }
   doc.tabs = config.tabs
-  return yaml.dump(doc, { indent: 2, lineWidth: 120 })
+  return dump(doc, { indent: 2, lineWidth: 120 })
 }

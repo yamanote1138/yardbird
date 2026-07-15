@@ -208,7 +208,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue'
 import { VueDraggable } from 'vue-draggable-plus'
-import yaml from 'js-yaml'
+import { load, dump } from 'js-yaml'
 import { useConfig } from '@/core/useConfig'
 import type { TabConfig, StoredConfig } from '@/core/types'
 
@@ -309,7 +309,7 @@ function exportConfig() {
   const pad = (n: number) => String(n).padStart(2, '0')
   const stamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
   const filename = `yardbird-config-${stamp}.yaml`
-  const text = yaml.dump(cfg.config.value, { indent: 2, lineWidth: 120 })
+  const text = dump(cfg.config.value, { indent: 2, lineWidth: 120 })
   const blob = new Blob([text], { type: 'text/yaml' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
@@ -347,7 +347,7 @@ function handleFileSelect(event: Event) {
   const reader = new FileReader()
   reader.onload = (e) => {
     try {
-      const parsed = yaml.load(e.target?.result as string)
+      const parsed = load(e.target?.result as string)
       if (!validateConfig(parsed)) {
         importError.value = 'Invalid config file — missing required fields or wrong version.'
         importPreview.value = null
