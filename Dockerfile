@@ -3,7 +3,7 @@
 # ============================================
 # Builder Stage
 # ============================================
-FROM node:22-alpine AS builder
+FROM node:26-alpine AS builder
 
 WORKDIR /usr/src/app
 
