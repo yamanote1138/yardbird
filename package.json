@@ -19,7 +19,7 @@
     "@nuxt/ui": "^4.9.0",
     "gridstack": "^12.6.0",
     "jmri-client": "^5.2.2",
-    "js-yaml": "^5.2.1",
+    "js-yaml": "^5.2.2",
     "tailwindcss": "^4.3.0",
     "vue": "^3.5.39",
     "vue-draggable-plus": "^0.6.1",
