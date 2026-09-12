@@ -53,17 +53,28 @@
       <UIcon name="i-heroicons-information-circle" class="w-5 h-5" />
     </UButton>
 
-    <UButton
-      color="neutral"
-      class="ml-auto"
-      @click="handleLogout"
-      title="Return to Welcome Screen"
-    >
-      <template #leading>
-        <UIcon name="i-heroicons-arrow-right-on-rectangle" />
-      </template>
-      <span class="hidden sm:inline">Exit</span>
-    </UButton>
+    <div class="ml-auto flex gap-1 md:gap-2">
+      <UButton
+        v-if="isStandalone"
+        color="neutral"
+        variant="outline"
+        @click="reload"
+        title="Reload"
+      >
+        <UIcon name="i-mdi-refresh" class="w-5 h-5" />
+      </UButton>
+
+      <UButton
+        color="neutral"
+        @click="handleLogout"
+        title="Return to Welcome Screen"
+      >
+        <template #leading>
+          <UIcon name="i-heroicons-arrow-right-on-rectangle" />
+        </template>
+        <span class="hidden sm:inline">Exit</span>
+      </UButton>
+    </div>
   </div>
 
   <!-- About modal -->
@@ -130,6 +141,7 @@ import { ref, computed } from 'vue'
 import { useJmri, ConnectionState } from '@/plugins/jmri'
 import { useConfig } from '@/core/useConfig'
 import { useEditMode } from '@/composables/useEditMode'
+import { useDisplayMode } from '@/composables/useDisplayMode'
 import { PowerState } from 'jmri-client'
 import { logger } from '@/utils/logger'
 import { version as appVersion } from '../../package.json'
@@ -150,6 +162,11 @@ const jmriConfig = computed(() => cfg.jmri.value)
 const haConfig = computed(() => cfg.homeassistant.value)
 
 const { editMode, toggle: toggleEditMode } = useEditMode()
+const { isStandalone } = useDisplayMode()
+
+function reload() {
+  window.location.reload()
+}
 
 const isBusy = ref(false)
 const isStopping = ref(false)

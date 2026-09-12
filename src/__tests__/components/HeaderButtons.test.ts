@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
+import { ref } from 'vue'
 import { mountWithUI, connectMockJmri } from '@/__tests__/test-utils'
 import HeaderButtons from '@/components/HeaderButtons.vue'
 import { useJmri } from '@/plugins/jmri'
@@ -14,10 +15,16 @@ vi.mock('@/core/useConfig', () => ({
   }),
 }))
 
+const mockIsStandalone = ref(false)
+vi.mock('@/composables/useDisplayMode', () => ({
+  useDisplayMode: () => ({ isStandalone: mockIsStandalone }),
+}))
+
 describe('HeaderButtons', () => {
   afterEach(async () => {
     useJmri().disconnect()
     useEditMode().exit()
+    mockIsStandalone.value = false
     await new Promise(r => setTimeout(r, 50))
   })
 
@@ -51,5 +58,29 @@ describe('HeaderButtons', () => {
       b.text().includes('Stop All') || b.attributes('title')?.includes('Emergency Stop')
     )
     expect(stopBtn?.attributes('disabled')).toBeDefined()
+  })
+
+  it('does not show a reload button in a normal browser tab', () => {
+    mockIsStandalone.value = false
+    const wrapper = mountWithUI(HeaderButtons)
+    expect(wrapper.find('[data-icon="i-mdi-refresh"]').exists()).toBe(false)
+  })
+
+  it('shows a reload button when running fullscreen or as an installed app', () => {
+    mockIsStandalone.value = true
+    const wrapper = mountWithUI(HeaderButtons)
+    expect(wrapper.find('[data-icon="i-mdi-refresh"]').exists()).toBe(true)
+  })
+
+  it('reload button reloads the page when clicked', async () => {
+    mockIsStandalone.value = true
+    const reload = vi.fn()
+    Object.defineProperty(window, 'location', { value: { reload }, configurable: true })
+
+    const wrapper = mountWithUI(HeaderButtons)
+    const reloadBtn = wrapper.findAll('button').find(b => b.attributes('title') === 'Reload')
+    await reloadBtn?.trigger('click')
+
+    expect(reload).toHaveBeenCalledOnce()
   })
 })

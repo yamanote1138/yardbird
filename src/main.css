@@ -1,7 +1,7 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
 
-/* Prevent native browser pull-to-refresh from firing behind our custom gesture */
+/* Reload is a header button now, not a swipe — keep native pull-to-refresh from firing */
 body {
   overscroll-behavior-y: none;
 }
