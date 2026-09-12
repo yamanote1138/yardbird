@@ -16,7 +16,7 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
-    "@nuxt/ui": "^4.11.0",
+    "@nuxt/ui": "^4.11.1",
     "gridstack": "^13.2.0",
     "jmri-client": "^5.2.2",
     "js-yaml": "^5.4.1",
