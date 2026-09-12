@@ -310,6 +310,14 @@ No `YB_*` variables — app config lives in the browser's localStorage; seed via
 
 ## Common Tasks
 
+### Node Version (non-interactive shells)
+
+Requires Node 24+ (`engines` in `package.json`, `.nvmrc`). Profile sourcing doesn't reliably reach non-interactive/scripted shells, so if `node --version` shows below 24, bootstrap nvm explicitly rather than assuming it's already on `PATH`:
+```bash
+export NVM_DIR="$HOME/.nvm" && source "$NVM_DIR/nvm.sh" && nvm use
+```
+`nvm use` with no argument reads `.nvmrc`. Run `nvm install` first if that version isn't installed yet. A stale system Node (e.g. an old Homebrew-linked one on `/usr/local/bin/node`) can ship an npm too old to resolve this project's dependency tree — always `nvm use` before `npm install`/`test`/`build` if unsure.
+
 ### Development
 ```bash
 npm install
