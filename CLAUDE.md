@@ -237,7 +237,7 @@ Config lives entirely in `localStorage` key `yardbird:config` (a `StoredConfig` 
 
 ### Testing
 
-- **Framework**: Vitest v4+ with jsdom environment; `@vue/test-utils` for component tests
+- **Framework**: Vitest v5+ with jsdom environment; `@vue/test-utils` for component tests
 - **Run**: `npm test` (single run), `npm run test:watch` (watch mode), `npm run coverage` (coverage report)
 - **Singleton reset**: module-scope composables must be reset in `afterEach`
   - `useEditMode().exit()` — resets edit mode to false
