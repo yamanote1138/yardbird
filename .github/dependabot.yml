@@ -26,3 +26,7 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Pinned to Node 24 (current Active LTS) — bump manually and raise this when we move to 26
+      - dependency-name: "node"
+        versions: [">24"]
