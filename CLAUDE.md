@@ -18,7 +18,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 24+** required
 
 ### Current Version
-v8.5.0 — DC loco PWM frequency control, extended throttle function support (F29+)
+v8.6.0 — reload button replaces swipe-to-reload in fullscreen/app mode
 
 ## User Context & Preferences
 
@@ -386,4 +386,4 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
 ---
 
-*Last updated: June 2026 — v8.5.0*
+*Last updated: September 2026 — v8.6.0*
