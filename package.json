@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.11.2",
-    "gridstack": "^13.2.0",
+    "gridstack": "^14.0.0",
     "jmri-client": "^5.2.3",
     "js-yaml": "^5.4.2",
     "tailwindcss": "^4.3.0",
