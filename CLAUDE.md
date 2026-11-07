@@ -18,7 +18,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Node.js 24+** required
 
 ### Current Version
-v8.6.0 — reload button replaces swipe-to-reload in fullscreen/app mode
+v8.7.0 — throttle ramps to any clicked segment; change locos without edit mode
 
 ## User Context & Preferences
 
@@ -386,4 +386,4 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
 ---
 
-*Last updated: September 2026 — v8.6.0*
+*Last updated: November 2026 — v8.7.0*
