@@ -98,7 +98,7 @@ function initGrid() {
       minRow: 3,
       handle: '.gs-drag-handle',
       acceptWidgets: '.ybw-palette-item',
-      float: true,
+      mode: 'float',
       disableDrag: !editMode.value,
       disableResize: !editMode.value,
       animate: true,
