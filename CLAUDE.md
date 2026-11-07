@@ -13,7 +13,7 @@ This file contains project conventions, architecture decisions, and development 
 - **Iconify** (Material Design Icons + Heroicons) for icons
 - **jmri-client 5.2+** for WebSocket-based JMRI communication (includes connection prefix support; F29–F68 support added in 5.2.0)
 - **js-yaml** for YAML import/export (`useYamlConfig.ts`)
-- **gridstack** for drag-and-drop / resize dashboard grid (widget canvas)
+- **gridstack 14** for drag-and-drop / resize dashboard grid (widget canvas; uses `mode: 'float'`, not the removed `float: true`)
 - **vue-draggable-plus** (SortableJS) for tab reordering in edit mode
 - **Node.js 24+** required
 
@@ -41,6 +41,7 @@ src/
 │   └── useYamlConfig.ts  — Stateless YAML import/export: sanitize(), importYaml(), exportYaml()
 │
 ├── composables/          — App-level singletons (not plugin-specific)
+│   ├── useDisplayMode.ts — Detects fullscreen / installed-app mode
 │   ├── useEditMode.ts    — Edit mode toggle (module-scope ref)
 │   └── useWidgetConfig.ts — Widget config modal state (open/confirm/cancel)
 │
@@ -49,6 +50,8 @@ src/
 │   ├── WidgetFrame.vue   — Edit-mode wrapper (drag handle, ⚙ config, ✕ delete)
 │   ├── WidgetPalette.vue — Slide-in sidebar listing draggable widget types (edit mode only)
 │   ├── WidgetConfigModal.vue — Modal shell + per-type config sub-forms
+│   ├── widgetContext.ts  — WIDGET_ID_KEY; WidgetFrame provides its widget id to the widget
+│   ├── dragState.ts      — Widget type being dragged from the palette
 │   └── config/
 │       ├── ThrottleConfig.vue
 │       ├── TurnoutConfig.vue
@@ -59,15 +62,16 @@ src/
 ├── plugins/
 │   ├── jmri/
 │   │   ├── index.ts                — useJmri composable (singleton)
+│   │   ├── speedRamp.ts            — createSpeedRamp: cancelable throttle ramping
+│   │   ├── useRecentLocos.ts       — Last 5 acquired locos (localStorage yardbird:recentLocos)
 │   │   └── components/
-│   │       ├── ThrottleList.vue, ThrottleCard.vue
-│   │       ├── TurnoutList.vue, TurnoutWidget.vue  (single-item widget)
-│   │       ├── LightList.vue, LightWidget.vue      (single-item widget)
+│   │       ├── ThrottleWidget.vue, ThrottleCard.vue
+│   │       ├── TurnoutWidget.vue, LightWidget.vue, PowerWidget.vue
 │   │       └── RosterCard.vue, LocomotiveHeader.vue
 │   └── homeassistant/
 │       ├── index.ts                — useHomeAssistant composable (singleton)
 │       └── components/
-│           └── SceneWidget.vue
+│           └── HaEntityWidget.vue
 │
 ├── components/           — Shared UI (not plugin-specific)
 │   ├── ConnectionSetup.vue   — Splash screen + connection management (add/edit JMRI, HA)
@@ -109,6 +113,18 @@ public/
 4. **Throttle Acquire**
    - If an address is not in the JMRI roster, a synthetic entry is created automatically on acquire
    - Throttles are released with speed set to 0 first; all throttles auto-released when JMRI power goes off
+
+4a. **Throttle Ramping** (`speedRamp.ts`, matches z-duino)
+   - Tapping a speed step ramps to exactly that level (lit or not) at 2 s per step; 0 is only reached via brake or E-stop
+   - A new tap cancels the running ramp and re-targets from the current speed
+   - JMRI echoes speed rounded to 128 DCC steps (30% → 0.3016) — "already there" check and segment colors use `AT_TARGET_TOLERANCE` (0.005)
+   - Direction while moving: ramp to 0, 500 ms, flip, 100 ms, ramp back; any speed tap / brake / E-stop cancels the flip
+   - E-stop is speed 0 — jmri-client's `emergencyStop()` is also just `setSpeed(0)`
+
+4b. **Runtime Loco Swap**
+   - Released throttle widgets show **Change loco** → opens the normal throttle config modal → `useConfig().updateWidgetConfig()`
+   - Last-used loco sticks (overwrites widget config); recent locos recorded on successful acquire in `RosterCard`
+   - `ThrottleConfig` disables addresses held by other throttle widgets (looked up via `useWidgetConfig().pending.widgetId`)
 
 5. **Power Zones**
    - `powerZones` in YAML defines per-connection power buttons; three modes: explicit array, `discover: true`, or omit for single button
@@ -365,7 +381,7 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 
 ## Component Test Suite — Complete
 
-26 test files, 159 tests covering all components except TabCanvas and App.vue (Gridstack/DOM-heavy). Infrastructure: `src/__tests__/setup.ts` + `src/__tests__/test-utils.ts`. See the **Component Tests** section above for patterns.
+34 test files, 246 tests covering all components except TabCanvas and App.vue (Gridstack/DOM-heavy). Infrastructure: `src/__tests__/setup.ts` + `src/__tests__/test-utils.ts`. See the **Component Tests** section above for patterns.
 
 - [x] **Phase 1** — Config persistence layer: `src/core/types.ts`, `src/core/useConfig.ts`, update `App.vue`
 - [x] **Phase 2** — Edit mode toggle: `src/composables/useEditMode.ts`, edit button in header
@@ -381,7 +397,7 @@ All phases implemented on `feat/visual-configurator`, merged to main at v8.0.0.
 - Widget type passes through drag via module-level `draggingWidgetType` in `src/widgets/dragState.ts` (not element attributes — the clone is a new DOM node)
 - Correct Gridstack event for external drag-ins is `dropped` `(event, prevNode, newNode)` — NOT `added` (which fires for `addWidget`/`makeWidget` only)
 - `setupDragIn` uses `{ flush: 'post' }` watch so palette DOM exists when it runs; `dragInSetup` flag resets on edit mode exit so it re-runs when palette remounts via `v-if`
-- **`acceptWidgets` must be `'.ybw-palette-item'`** — when set to `true`, Gridstack v12 internally hardcodes the selector as `.grid-stack-item` (`gridstack.js:2345`), which never matches our palette divs. Use the explicit class selector.
+- **`acceptWidgets` must be `'.ybw-palette-item'`** — when set to `true`, Gridstack internally swaps in `.grid-stack-item` (still true in v14, `gridstack.js:2556`), which never matches our palette divs. Use the explicit class selector.
 - Grid has `minRow: 3` (240px min height); empty-state overlay uses `pointer-events-none` so it never blocks drops
 
 ---

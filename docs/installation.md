@@ -40,7 +40,7 @@ $EDITOR config/yardbird.yaml
 docker compose up -d
 ```
 
-Open `http://<your-server>:9273` in a browser. Changes to `config/yardbird.yaml` take effect on the next browser page load — no container restart needed.
+Open `http://<your-server>:9273` in a browser. On a browser with no saved setup, YardBird spots the mounted file and offers to import it. After that, settings live in the browser and are changed in the app; editing the file again only affects browsers that haven't been set up yet (or have been reset).
 
 ### Custom port
 
@@ -67,10 +67,7 @@ docker compose -f compose.dev.yaml up --build   # http://localhost:5173
 ```bash
 npm install
 
-# Edit the default config
-$EDITOR public/yardbird.yaml
-
-# Start the dev server
+# Start the dev server (then fill in the setup screen)
 npm run dev          # http://localhost:5173
 
 # Other commands
@@ -83,7 +80,7 @@ The dev server binds to all interfaces (`host: true` in `vite.config.ts`), so yo
 
 ### Testing without hardware
 
-Set `mock: true` in `yardbird.yaml` (under `plugins.jmri`). The app will simulate JMRI responses — no JMRI server or layout hardware required.
+Tick **Mock mode** in the JMRI connection settings on the setup screen (or set `mock: true` under `plugins.jmri` in a YAML you import). The app simulates JMRI responses — no JMRI server or layout hardware required.
 
 ## JMRI setup
 
@@ -91,25 +88,26 @@ Set `mock: true` in `yardbird.yaml` (under `plugins.jmri`). The app will simulat
 
 In JMRI: **Preferences → Web Server** — check **Enable**, and ensure **JSON WebSocket** is checked. The default port is **12080**.
 
-### DCC-EX tram control
+### DCC-EX connection (DC locos)
 
-YardBird controls DC tram loops through JMRI. No separate proxy is needed.
+YardBird runs DC locos through JMRI and DCC-EX. No separate proxy is needed.
 
 1. Add your DCC-EX command station in JMRI: **Preferences → Connections → Add** → DCC-EX, configure IP and port (DCC-EX default: 2560).
 2. Note the prefix letter JMRI assigns (shown in the connection list, typically `D`).
-3. Set `tramPrefix: D` (or your prefix) in `yardbird.yaml`.
+3. Add that prefix as a command station (setup screen, or `commandStations` in YAML), then pick it in the throttle widget's settings.
+4. Locos on addresses 30–32 show PWM frequency buttons; Supersonic is set automatically on acquire.
 
 If JMRI loses its DCC-EX connection (e.g. the command station is power-cycled), it will **not** auto-reconnect — restart JMRI to restore it.
 
 ## First run
 
-On first load, YardBird reads `yardbird.yaml` and saves the connection settings to localStorage. You'll be presented with a connection screen prefilled from your config. Click **All Aboard!** to connect.
+On first load you'll see the setup screen. Enter your JMRI host and port (or import a `yardbird.yaml`), then click **All Aboard!** to connect. With Docker, if a config file is mounted, the setup screen offers to import it in one click.
 
 If there are no tabs yet (first run or after a reset), you'll see a welcome screen prompting you to enter edit mode and build your dashboard.
 
 ## Resetting to defaults
 
-To clear your saved dashboard layout and reload from `yardbird.yaml`:
+To clear your saved setup and dashboard and go back to the setup screen:
 
 - In the app: enter edit mode → click the reset (↺) button in the tab bar
 - Via browser DevTools: clear `yardbird:config` from Application → Local Storage, then reload

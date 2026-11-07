@@ -22,10 +22,11 @@ YardBird is a pure frontend SPA that connects directly to your layout hardware �
 ## Features
 
 - **Visual dashboard editor** — drag widgets onto a grid, resize, reorder tabs, import/export config
-- **Locomotive throttles** — speed, direction, and function buttons from your JMRI roster
+- **Locomotive throttles** — tap a speed step and the train ramps smoothly to it; direction and function buttons from your JMRI roster
+- **Quick loco swaps** — change which loco a throttle drives without entering edit mode, with your recent locos one tap away
 - **Turnouts** — toggle switch positions via JMRI / LCC
 - **Lights** — toggle LCC lights, independent of track power
-- **DC tram control** — JMRI-native tram loop control via a DCC-EX sub-connection, with configurable PWM frequency
+- **DC locos via DCC-EX** — addresses 30–32 get PWM frequency buttons for DC running through a DCC-EX connection
 - **Command station power** — per-connection power buttons with combined on/off in the header
 - **Home Assistant** — control HA lights and switches from your dashboard
 - **Responsive** — works on desktop, tablet, and mobile
@@ -50,11 +51,11 @@ npm install
 npm run dev    # http://localhost:5173
 ```
 
-See [docs/installation.md](docs/installation.md) for full setup details, including JMRI prerequisites and DCC-EX tram control.
+See [docs/installation.md](docs/installation.md) for full setup details, including JMRI prerequisites and DCC-EX setup.
 
 ## Configuration
 
-Connection settings are managed through the UI and saved in localStorage. `yardbird.yaml` provides factory defaults — it is only read when no saved config exists (first run or after a reset).
+Connection settings and your dashboard are managed in the app and saved in the browser's localStorage. On first run you fill in the setup screen or import a `yardbird.yaml`; Docker setups can mount one so the app offers to import it.
 
 See [docs/configuration.md](docs/configuration.md) for the full YAML schema, widget reference, and export/import format.
 

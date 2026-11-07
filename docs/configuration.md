@@ -2,20 +2,22 @@
 
 ## How config works
 
-YardBird has two config layers:
+Everything YardBird uses lives in the browser's localStorage under `yardbird:config` (a `StoredConfig` JSON blob): connection settings, tabs, widgets, and their positions. You change it through the app.
 
-| Layer | Format | Where |
+YAML is only an import/export format:
+
+| What | Format | Used for |
 |---|---|---|
-| **Factory defaults** | `LayoutConfig` (YAML) | `yardbird.yaml` / `config/yardbird.yaml` |
-| **Active config** | `StoredConfig` (JSON) | Browser localStorage (`yardbird:config`) |
+| `yardbird.yaml` | `plugins:` shape (below) | First-run import — by hand from the setup screen, or offered automatically when Docker mounts one |
+| Tab bar **Export** | `StoredConfig` shape | Backing up or moving your full dashboard between browsers |
 
-On first load, the factory defaults are read from `yardbird.yaml`, migrated to `StoredConfig`, and saved to localStorage. All subsequent loads use localStorage — the YAML file is not re-read unless you reset to defaults.
+Once a browser is set up, editing `yardbird.yaml` doesn't change it. Reset (or import) to start over.
 
-Your full dashboard layout (tabs, widgets, positions, connection settings) is stored in localStorage and can be exported to a YAML file from within the app for backup and transfer between devices.
+The list of recently used locos is kept separately under `yardbird:recentLocos` and isn't exported.
 
 ---
 
-## yardbird.yaml (factory defaults)
+## yardbird.yaml
 
 Copy `yardbird.example.yaml` and edit it. Full schema:
 
@@ -30,11 +32,6 @@ plugins:
     port: 12080               # JSON WebSocket port (default: 12080)
     secure: false             # true → wss:// (for TLS / reverse-proxy setups)
     mock: false               # true → simulated data, no hardware required
-
-    # Tram / DC loop control
-    tramPrefix: D             # System-connection prefix for DCC-EX in JMRI
-                              # Omit if you have only one system connection
-    tramPwmFreq: 3            # PWM frequency on acquire: 0=131Hz 1=490Hz 2=3.4kHz 3=Supersonic
 
     # Command station power buttons in the header toolbar.
     # Option A — explicit stations:
@@ -61,7 +58,7 @@ tabs: []
 
 ### Connection prefix
 
-The `prefix` field in `commandStations` (and `tramPrefix`) must match the system-connection prefix JMRI uses internally. To find it:
+The `prefix` field in `commandStations` must match the system-connection prefix JMRI uses internally. To find it:
 
 1. Enable `debug: true` in `yardbird.yaml` and connect
 2. Open the browser console — prefix letters appear in the connection logs
@@ -84,6 +81,23 @@ Drag a widget from the left palette onto the canvas. A config modal opens immedi
 ### Configuring existing widgets
 
 In edit mode, click the ⚙ (gear) icon on any widget.
+
+### Changing a throttle's loco (no edit mode needed)
+
+When a throttle is released, its widget shows a **Change loco** button. It opens the same picker as the gear:
+
+- **Recent** — the last 5 locos you acquired, at the top
+- **Roster** — your JMRI roster, with group filters
+- **DCC address** — type any address
+
+Your pick is saved right away and stays after a reload. Locos already on another throttle widget are grayed out. The button is hidden while the throttle is acquired, so you can't swap a loco that might still be moving.
+
+### Driving a throttle
+
+- **Speed steps** — tap any of the 10 steps (10%–100%) and the loco ramps there at 2 seconds per step. Tap another step mid-ramp to change course.
+- **Direction** — if moving, ramps down, flips, and ramps back up to the same speed
+- **Brake** — ramps down to a stop
+- **E-Stop** — stops immediately and cancels any ramp
 
 ### Moving and resizing
 
@@ -112,7 +126,7 @@ In edit mode, the tab bar right side shows:
 
 | Widget | Plugin | Config fields |
 |---|---|---|
-| **Throttle** (`jmri-throttle`) | JMRI | DCC address, command station |
+| **Throttle** (`jmri-throttle`) | JMRI | DCC address, command station (loco can also be changed at runtime) |
 | **Turnout** (`jmri-turnout`) | JMRI | JMRI turnout system name |
 | **Light** (`jmri-light`) | JMRI | JMRI light system name |
 | **Command Station** (`jmri-power`) | JMRI | Connection prefix, label |
@@ -137,8 +151,6 @@ connections:
     port: 12080
     secure: false
     mock: false
-    tramPrefix: D
-    tramPwmFreq: 3
     commandStations:
       - name: DCC
         prefix: L
@@ -190,6 +202,6 @@ Import a `StoredConfig` file via the editor's Import button. The file is validat
 - Restart JMRI to restore the connection
 
 **Config changes not appearing**
-- `yardbird.yaml` is only read on first load (or after reset)
-- Changes to the active config are made through the visual editor or import
-- To force a YAML re-read: reset to defaults (editor → ↺) or clear `yardbird:config` from DevTools → Application → Local Storage
+- `yardbird.yaml` is only offered for import on a browser with no saved setup
+- Changes to the active config are made in the app or by importing
+- To start over: reset (editor → ↺) or clear `yardbird:config` from DevTools → Application → Local Storage, then reload

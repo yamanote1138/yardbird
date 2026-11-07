@@ -4,9 +4,10 @@
 #   Docker / production  →  config/yardbird.yaml  (volume-mounted at /config)
 #   Development          →  public/yardbird.yaml
 #
-# This file provides factory defaults. Once you connect and build your
-# dashboard through the visual editor, your layout is saved in the browser's
-# localStorage. This file is only read again if you reset to defaults.
+# This file is an import source, not live config. On a browser with no saved
+# setup, YardBird offers to import it from the setup screen (Docker), or you can
+# import it by hand. After that, everything is saved in the browser's
+# localStorage and edited in the app.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Enable verbose logging in the browser console (useful for troubleshooting)
@@ -23,22 +24,11 @@ plugins:
     secure: false             # true → wss:// (for TLS / reverse-proxy setups)
     mock: false               # true → simulated data, no hardware needed
 
-    # ── Tram / DC loop control ─────────────────────────────────────────────
-    # YardBird controls DC tram loops natively through JMRI + DCC-EX.
-    # Add your DCC-EX command station in JMRI Preferences → Connections first.
-    #
-    # tramPrefix: the system-connection prefix JMRI assigned to DCC-EX.
-    # Omit entirely if your layout has only one system connection.
-    # To find it: enable debug: true, connect, check the browser console —
-    # or look in JMRI Preferences → Connections (letter shown next to DCC-EX).
-    tramPrefix: D
-
-    # DC PWM frequency applied when a tram throttle is acquired (via F29/F30/F31).
-    #   0 = 131 Hz  (audible hum)
-    #   1 = ~490 Hz
-    #   2 = ~3.4 kHz
-    #   3 = Supersonic  (recommended — silent DC operation)
-    tramPwmFreq: 3
+    # ── DC locos via DCC-EX ────────────────────────────────────────────────
+    # Locos on addresses 30-32 get PWM frequency buttons instead of function
+    # buttons (Supersonic is set on acquire). To run them through a separate
+    # DCC-EX connection, list its prefix under commandStations below, then pick
+    # that command station in the throttle widget's settings.
 
     # ── Command station power buttons ──────────────────────────────────────
     # Controls the power toggle buttons shown in the header toolbar.
@@ -49,7 +39,7 @@ plugins:
       - name: DCC             # Label shown on the button
         prefix: "L"           # System connection prefix (must match JMRI)
       - name: Trams
-        prefix: D             # Should match tramPrefix above
+        prefix: D             # e.g. a DCC-EX connection for DC locos
 
     # Mode B — auto-discover stations from JMRI:
     # commandStations:
