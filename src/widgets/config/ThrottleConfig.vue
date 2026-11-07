@@ -1,5 +1,19 @@
 <template>
   <div class="space-y-3">
+    <div v-if="recentLocos.length > 0">
+      <p class="text-xs text-neutral-400 mb-1">Recent</p>
+      <div class="flex flex-wrap gap-1.5">
+        <RosterButton
+          v-for="loco in recentLocos"
+          :key="`${loco.commandStation ?? ''}:${loco.address}`"
+          :entry="loco"
+          :selected="selectedAddress"
+          :disabled="takenAddresses.has(loco.address)"
+          @select="pickRecent(loco)"
+        />
+      </div>
+    </div>
+
     <div>
       <label class="text-sm text-neutral-300 block mb-1">DCC Address</label>
       <UInput
@@ -10,6 +24,9 @@
         placeholder="e.g. 3"
         class="w-full"
       />
+      <p v-if="takenAddresses.has(selectedAddress)" class="text-xs text-amber-400 mt-1">
+        Address {{ selectedAddress }} is already on another throttle
+      </p>
     </div>
 
     <div v-if="commandStations.length > 0">
@@ -86,6 +103,7 @@
               :key="entry.address"
               :entry="entry"
               :selected="selectedAddress"
+              :disabled="takenAddresses.has(entry.address)"
               @select="selectedAddress = $event"
             />
             <p v-if="!group.entries.length" class="text-xs text-neutral-600">None connected</p>
@@ -99,6 +117,7 @@
               :key="entry.address"
               :entry="entry"
               :selected="selectedAddress"
+              :disabled="takenAddresses.has(entry.address)"
               @select="selectedAddress = $event"
             />
           </div>
@@ -113,6 +132,7 @@
             :key="entry.address"
             :entry="entry"
             :selected="selectedAddress"
+            :disabled="takenAddresses.has(entry.address)"
             @select="selectedAddress = $event"
           />
           <p v-if="!filteredGroupEntries.length" class="text-xs text-neutral-600">None connected</p>
@@ -127,6 +147,7 @@
             :key="entry.address"
             :entry="entry"
             :selected="selectedAddress"
+            :disabled="takenAddresses.has(entry.address)"
             @select="selectedAddress = $event"
           />
         </div>
@@ -138,12 +159,27 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, defineComponent, h } from 'vue'
 import { useJmri } from '@/plugins/jmri'
-import type { RosterEntry } from '@/types/jmri'
+import { useRecentLocos, type RecentLoco } from '@/plugins/jmri/useRecentLocos'
+import { useConfig } from '@/core/useConfig'
+import { useWidgetConfig } from '@/composables/useWidgetConfig'
 
 const props = defineProps<{ config: Record<string, unknown> }>()
 const emit = defineEmits<{ update: [config: Record<string, unknown>] }>()
 
 const { ungroupedRoster, groupedRoster, commandStations, fetchRosterGroups, isConnected } = useJmri()
+const { recentLocos } = useRecentLocos()
+const { tabs } = useConfig()
+const { pending } = useWidgetConfig()
+
+// Addresses held by other throttle widgets — picking one would put two widgets on one loco
+const takenAddresses = computed(() => {
+  const self = pending.value?.widgetId
+  return new Set(
+    tabs.value.flatMap(t => t.widgets)
+      .filter(w => w.type === 'jmri-throttle' && w.id !== self)
+      .map(w => w.config.address as number),
+  )
+})
 
 const isReloading = ref(false)
 
@@ -184,6 +220,11 @@ const allRoster = computed(() => [
   ...ungroupedRoster.value,
 ])
 
+function pickRecent(loco: RecentLoco) {
+  selectedAddress.value = loco.address
+  if (loco.commandStation !== undefined) selectedCommandStation.value = loco.commandStation
+}
+
 // Entries for the currently selected named group
 const filteredGroupEntries = computed(() =>
   groupedRoster.value.find(g => g.name === activeFilter.value)?.entries ?? []
@@ -191,18 +232,23 @@ const filteredGroupEntries = computed(() =>
 
 const RosterButton = defineComponent({
   props: {
-    entry: { type: Object as () => RosterEntry, required: true },
+    entry: { type: Object as () => { address: number; name: string }, required: true },
     selected: { type: Number, required: true },
+    disabled: { type: Boolean, default: false },
   },
   emits: ['select'],
   setup(props, { emit }) {
     return () => h('button', {
       class: [
         'px-2 py-1 text-xs rounded border transition-colors',
-        props.selected === props.entry.address
-          ? 'border-blue-500 bg-blue-500/20 text-blue-300'
-          : 'border-white/20 bg-white/5 text-neutral-300 hover:border-white/40',
+        props.disabled
+          ? 'border-white/10 bg-white/5 text-neutral-600 cursor-not-allowed'
+          : props.selected === props.entry.address
+            ? 'border-blue-500 bg-blue-500/20 text-blue-300'
+            : 'border-white/20 bg-white/5 text-neutral-300 hover:border-white/40',
       ],
+      disabled: props.disabled,
+      title: props.disabled ? 'On another throttle' : undefined,
       onClick: () => emit('select', props.entry.address),
     }, `${props.entry.name} (${props.entry.address})`)
   },

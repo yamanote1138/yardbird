@@ -24,6 +24,8 @@ import { useJmri } from '@/plugins/jmri'
 import { PowerState } from 'jmri-client'
 import type { RosterEntry } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'
+import { useRecentLocos } from '@/plugins/jmri/useRecentLocos'
+import { logger } from '@/utils/logger'
 
 const props = defineProps<{
   entry: RosterEntry
@@ -31,6 +33,7 @@ const props = defineProps<{
 }>()
 
 const { isConnected, power, powerByPrefix, acquireThrottle } = useJmri()
+const { recordLoco } = useRecentLocos()
 
 const isAcquiring = ref(false)
 
@@ -49,6 +52,9 @@ async function onAcquire() {
   isAcquiring.value = true
   try {
     await acquireThrottle(props.entry.address, props.commandStation)
+    recordLoco({ address: props.entry.address, name: props.entry.name, commandStation: props.commandStation })
+  } catch (error) {
+    logger.error('Failed to acquire throttle:', error)
   } finally {
     isAcquiring.value = false
   }

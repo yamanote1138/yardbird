@@ -128,6 +128,26 @@ describe('useConfig', () => {
     })
   })
 
+  describe('updateWidgetConfig', () => {
+    it('replaces one widget config across tabs and persists it', async () => {
+      const stored = {
+        version: 1,
+        connections: { jmri: { host: 'localhost', port: 12080 } },
+        tabs: [
+          { id: 'a', name: 'A', widgets: [{ id: 'w1', type: 'jmri-throttle', grid: { x: 0, y: 0, w: 4, h: 5 }, config: { address: 11 } }] },
+          { id: 'b', name: 'B', widgets: [{ id: 'w2', type: 'jmri-throttle', grid: { x: 0, y: 0, w: 4, h: 5 }, config: { address: 3 } }] },
+        ],
+      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored))
+      const cfg = await freshConfig()
+      cfg.updateWidgetConfig('w2', { address: 1, commandStation: 'D' })
+      expect(cfg.tabs.value[1].widgets[0].config).toEqual({ address: 1, commandStation: 'D' })
+      expect(cfg.tabs.value[0].widgets[0].config).toEqual({ address: 11 })
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY)!)
+      expect(saved.tabs[1].widgets[0].config.address).toBe(1)
+    })
+  })
+
   describe('reset', () => {
     it('removes config from localStorage and sets needsSetup', async () => {
       const stored = {
