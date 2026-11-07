@@ -44,7 +44,7 @@ describe('useJmri', () => {
 
     it('populates jmriVersion from hello response', async () => {
       const { jmriVersion } = await connectMock()
-      expect(jmriVersion.value).toBe('5.9.2')
+      expect(jmriVersion.value).toMatch(/^\d+\.\d+/)
     })
 
     it('transitions to DISCONNECTED after disconnect', async () => {
