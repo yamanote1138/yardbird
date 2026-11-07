@@ -57,6 +57,14 @@ export function useConfig() {
     saveToStorage(config.value)
   }
 
+  function updateWidgetConfig(widgetId: string, widgetConfig: Record<string, unknown>): void {
+    if (!config.value) return
+    saveTabs(config.value.tabs.map(t => ({
+      ...t,
+      widgets: t.widgets.map(w => w.id === widgetId ? { ...w, config: widgetConfig } : w),
+    })))
+  }
+
   // Works even when needsSetup (config is null) — creates a new minimal StoredConfig.
   function saveConnections(connections: StoredConfig['connections']): void {
     const base = config.value ?? { version: 1 as const, connections: {}, tabs: [] }
@@ -91,6 +99,7 @@ export function useConfig() {
     debug:         computed(() => config.value?.debug ?? false),
     save,
     saveTabs,
+    updateWidgetConfig,
     saveConnections,
     applyImport,
     reset,

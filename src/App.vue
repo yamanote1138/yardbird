@@ -186,10 +186,7 @@ function openWidgetConfig(widgetId: string) {
   if (!tab) return
   const widget = tab.widgets.find(w => w.id === widgetId)!
   wc.openForEdit(widgetId, widget.type, widget.config, (newConfig) => {
-    cfg.saveTabs(cfg.tabs.value.map(t => ({
-      ...t,
-      widgets: t.widgets.map(w => w.id === widgetId ? { ...w, config: newConfig } : w),
-    })))
+    cfg.updateWidgetConfig(widgetId, newConfig)
   })
 }
 

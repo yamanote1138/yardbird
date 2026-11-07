@@ -47,10 +47,11 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent, computed } from 'vue'
+import { defineAsyncComponent, computed, provide } from 'vue'
 import { useEditMode } from '@/composables/useEditMode'
 import { getWidgetDef } from '@/widgets/registry'
 import type { WidgetType } from '@/core/types'
+import { WIDGET_ID_KEY } from '@/widgets/widgetContext'
 
 const props = defineProps<{
   widgetId: string
@@ -64,6 +65,8 @@ defineEmits<{
 }>()
 
 const { editMode } = useEditMode()
+
+provide(WIDGET_ID_KEY, props.widgetId)
 
 const def = computed(() => getWidgetDef(props.widgetType))
 
