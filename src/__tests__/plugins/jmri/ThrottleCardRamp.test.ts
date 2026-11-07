@@ -123,6 +123,29 @@ describe('ThrottleCard ramping', () => {
     expect(throttle.speed).toBe(0)
   })
 
+  it('waits after flipping direction before ramping back up', async () => {
+    throttle.speed = 0.2
+    let flippedAt = 0
+    const speedTimes: number[] = []
+    setThrottleDirection.mockImplementationOnce(async (_a, d) => { throttle.direction = d; flippedAt = Date.now() })
+    setThrottleSpeed.mockImplementation(async (_a, s) => { throttle.speed = s; speedTimes.push(Date.now()) })
+    const w = mountCard()
+    await controlButton(w, 'Forward').trigger('click')
+    await vi.advanceTimersByTimeAsync(20000)
+    const firstAfterFlip = speedTimes.find(t => t > flippedAt)!
+    expect(firstAfterFlip - flippedAt).toBeGreaterThanOrEqual(200)
+    expect(throttle.speed).toBe(0.2)
+    setThrottleSpeed.mockImplementation(async (_a, s) => { throttle.speed = s })
+  })
+
+  it('disables brake when the loco is stopped', async () => {
+    const w = mountCard()
+    expect(controlButton(w, 'Brake').attributes('disabled')).toBeDefined()
+    throttle.speed = 0.3
+    await w.vm.$nextTick()
+    expect(controlButton(w, 'Brake').attributes('disabled')).toBeUndefined()
+  })
+
   it('E-stop cancels the ramp and sets zero immediately', async () => {
     const w = mountCard()
     await segment(w, 9).trigger('click')

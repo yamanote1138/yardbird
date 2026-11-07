@@ -62,7 +62,7 @@
             class="flex-1"
             color="warning"
             @click="brakeThrottle"
-            :disabled="controlsDisabled"
+            :disabled="controlsDisabled || throttle.speed === 0"
           >
             <template #leading><UIcon name="i-heroicons-pause" /></template>
             <span class="hidden">Brake</span>
@@ -149,6 +149,7 @@ const isReleasing = ref(false)
 const powerLevels = POWER_LEVELS
 const RAMP_TIME_PER_SEGMENT = 2000
 const DIRECTION_PAUSE = 500
+const AFTER_FLIP_PAUSE = 100
 
 const ramp = createSpeedRamp({
   getSpeed: () => props.throttle.speed,
@@ -246,6 +247,8 @@ async function toggleDirection() {
     await new Promise(resolve => setTimeout(resolve, DIRECTION_PAUSE))
     if (token !== speedActions) return
     await setThrottleDirection(props.throttle.address, newDirection)
+    await new Promise(resolve => setTimeout(resolve, AFTER_FLIP_PAUSE))
+    if (token !== speedActions) return
     ramp.rampTo(previousSpeed)
   } else {
     await setThrottleDirection(props.throttle.address, newDirection)

@@ -6,6 +6,8 @@ const SEGMENT_SIZE = 0.1
 const RAMP_INTERVAL = 100
 const MIN_DURATION = 200
 const MIN_STEPS = 5
+// Speed echoed back by JMRI can drift from what was sent (DCC step rounding)
+const AT_TARGET_TOLERANCE = 0.005
 
 interface SpeedRampOptions {
   getSpeed: () => number
@@ -26,14 +28,13 @@ export function createSpeedRamp({ getSpeed, setSpeed, msPerSegment }: SpeedRampO
   async function rampTo(targetSpeed: number): Promise<boolean> {
     const run = ++currentRun
     const startSpeed = getSpeed()
-    if (startSpeed === targetSpeed) {
-      stop()
+    if (!isRamping.value && Math.abs(startSpeed - targetSpeed) < AT_TARGET_TOLERANCE) {
       return true
     }
 
     isRamping.value = true
 
-    const segments = Math.abs(targetSpeed - startSpeed) / SEGMENT_SIZE
+    const segments = Math.round(Math.abs(targetSpeed - startSpeed) / SEGMENT_SIZE)
     const duration = Math.max(segments * msPerSegment, MIN_DURATION)
     const steps = Math.max(Math.ceil(duration / RAMP_INTERVAL), MIN_STEPS)
 

@@ -69,6 +69,32 @@ describe('createSpeedRamp', () => {
     expect(await second).toBe(true)
   })
 
+  it('does nothing when steady within rounding of the target', async () => {
+    const { loco, ramp } = makeLoco(0.3968)
+    await ramp.rampTo(0.4)
+    expect(loco.calls).toEqual([])
+  })
+
+  it('pins the speed when re-targeted to where it is mid-ramp', async () => {
+    const { loco, ramp } = makeLoco(0)
+    ramp.rampTo(1.0)
+    await vi.advanceTimersByTimeAsync(4000)
+    const here = loco.speed
+    ramp.rampTo(here)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(loco.speed).toBe(here)
+    expect(ramp.isRamping.value).toBe(false)
+  })
+
+  it('rounds the ramp to whole segments', async () => {
+    const { loco, ramp } = makeLoco(0.35)
+    ramp.rampTo(0.8)
+    await vi.advanceTimersByTimeAsync(9500)
+    expect(loco.speed).toBeLessThan(0.8)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(loco.speed).toBe(0.8)
+  })
+
   it('does nothing when already at the target', async () => {
     const { loco, ramp } = makeLoco(0.5)
     await ramp.rampTo(0.5)
