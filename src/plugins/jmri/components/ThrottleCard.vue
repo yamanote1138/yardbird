@@ -34,7 +34,7 @@
             :key="level"
             class="speed-segment flex-1 rounded transition-colors"
             :class="getSpeedButtonClass(level, index)"
-            @click="setPowerLevel(level, index)"
+            @click="setPowerLevel(index)"
             :disabled="controlsDisabled"
           >&nbsp;</button>
         </div>
@@ -128,6 +128,7 @@ import { PowerState } from 'jmri-client'
 import type { Throttle } from '@/types/jmri'
 import { Direction } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'
+import { createSpeedRamp, targetForSegment, POWER_LEVELS } from '@/plugins/jmri/speedRamp'
 import { logger } from '@/utils/logger'
 
 const props = defineProps<{
@@ -145,13 +146,15 @@ const PWM_BUTTONS = [
 const { isConnected, power, setThrottleSpeed, setThrottleDirection, setThrottleFunction, releaseThrottle } = useJmri()
 
 const isReleasing = ref(false)
-const isRamping = ref(false)
-const stopFlag = ref(false)
-const targetSpeed = ref<number | null>(null)
+const powerLevels = POWER_LEVELS
+const RAMP_TIME_PER_SEGMENT = 2000
+const DIRECTION_PAUSE = 500
 
-// Power level buttons: 10 segments at 10% each
-const powerLevels = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
-const RAMP_TIME_PER_SEGMENT = 2000 // 2 seconds per segment
+const ramp = createSpeedRamp({
+  getSpeed: () => props.throttle.speed,
+  setSpeed: speed => setThrottleSpeed(props.throttle.address, speed),
+  msPerSegment: RAMP_TIME_PER_SEGMENT,
+})
 
 // Disable controls when not connected or power is off
 const controlsDisabled = computed(() => {
@@ -223,102 +226,40 @@ const functionButtons = computed(() => {
   return buttons.sort((a, b) => a.number - b.number)
 })
 
-/**
- * Set power level with segment-based ramping
- */
-async function setPowerLevel(clickedLevel: number, clickedIndex: number) {
-  if (isRamping.value) return
+// Bumped by any user speed action so an in-flight direction change knows to abort
+let speedActions = 0
 
-  const currentSpeed = props.throttle.speed
-
-  let leftmostLitIndex = -1
-  let rightmostLitIndex = -1
-
-  for (let i = 0; i < powerLevels.length; i++) {
-    if (currentSpeed >= powerLevels[i]) {
-      if (leftmostLitIndex === -1) leftmostLitIndex = i
-      rightmostLitIndex = i
-    }
-  }
-
-  const isSegmentLit = currentSpeed >= clickedLevel
-
-  let targetSpeedValue: number
-  let segmentDistance: number
-
-  if (isSegmentLit) {
-    if (clickedIndex === 0) {
-      targetSpeedValue = 0
-      segmentDistance = rightmostLitIndex + 1
-    } else {
-      const targetIndex = clickedIndex - 1
-      targetSpeedValue = powerLevels[targetIndex]
-      segmentDistance = rightmostLitIndex - targetIndex
-    }
-  } else {
-    targetSpeedValue = clickedLevel
-    const fromIndex = leftmostLitIndex === -1 ? -1 : leftmostLitIndex
-    segmentDistance = clickedIndex - fromIndex
-  }
-
-  if (currentSpeed === targetSpeedValue) return
-
-  stopFlag.value = false
-  isRamping.value = true
-  targetSpeed.value = clickedLevel
-
-  try {
-    const duration = segmentDistance * RAMP_TIME_PER_SEGMENT
-    const interval = 100
-    const steps = Math.max(5, Math.ceil(duration / interval))
-
-    for (let i = 1; i <= steps; i++) {
-      if (stopFlag.value) {
-        await setThrottleSpeed(props.throttle.address, 0)
-        break
-      }
-
-      const t = i / steps
-      const speed = currentSpeed + (targetSpeedValue - currentSpeed) * t
-      await setThrottleSpeed(props.throttle.address, speed)
-
-      if (i < steps) {
-        await new Promise(resolve => setTimeout(resolve, interval))
-      }
-    }
-
-    if (!stopFlag.value) {
-      await setThrottleSpeed(props.throttle.address, targetSpeedValue)
-    }
-  } finally {
-    isRamping.value = false
-    targetSpeed.value = null
-  }
+function setPowerLevel(index: number) {
+  speedActions++
+  ramp.rampTo(targetForSegment(props.throttle.speed, index))
 }
 
 async function toggleDirection() {
-  const currentSpeed = props.throttle.speed
+  const previousSpeed = props.throttle.speed
   const newDirection = props.throttle.directionVerified && props.throttle.direction === Direction.FORWARD
     ? Direction.REVERSE
     : Direction.FORWARD
 
-  if (currentSpeed > 0) {
-    const currentIndex = powerLevels.findIndex(level => Math.abs(level - currentSpeed) < 0.01) || 0
-    await setPowerLevel(powerLevels[0], 0)
-    await new Promise(resolve => setTimeout(resolve, 1800))
+  if (previousSpeed > 0) {
+    const token = ++speedActions
+    if (!await ramp.rampTo(0)) return
+    await new Promise(resolve => setTimeout(resolve, DIRECTION_PAUSE))
+    if (token !== speedActions) return
     await setThrottleDirection(props.throttle.address, newDirection)
-    await setPowerLevel(currentSpeed, currentIndex)
+    ramp.rampTo(previousSpeed)
   } else {
     await setThrottleDirection(props.throttle.address, newDirection)
   }
 }
 
-async function brakeThrottle() {
-  await setPowerLevel(powerLevels[0], 0)
+function brakeThrottle() {
+  speedActions++
+  ramp.rampTo(0)
 }
 
 function emergencyStop() {
-  stopFlag.value = true
+  speedActions++
+  ramp.stop()
   setThrottleSpeed(props.throttle.address, 0)
 }
 
