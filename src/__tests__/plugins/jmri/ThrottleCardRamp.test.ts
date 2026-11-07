@@ -146,6 +146,26 @@ describe('ThrottleCard ramping', () => {
     expect(controlButton(w, 'Brake').attributes('disabled')).toBeUndefined()
   })
 
+  it('does not dim the next segment when JMRI echoes a speed just above a level', () => {
+    throttle.speed = 38 / 126
+    const w = mountCard()
+    expect(segment(w, 2).classes()).toContain('bg-red-600')
+    expect(segment(w, 3).classes()).toContain('bg-neutral-700')
+  })
+
+  it('fully lights a segment when JMRI echoes a speed just below its level', () => {
+    throttle.speed = 50 / 126
+    const w = mountCard()
+    expect(segment(w, 3).classes()).toContain('bg-amber-500')
+    expect(segment(w, 3).classes()).not.toContain('bg-amber-500/50')
+  })
+
+  it('still shows a segment as approaching mid-ramp', () => {
+    throttle.speed = 0.35
+    const w = mountCard()
+    expect(segment(w, 3).classes()).toContain('bg-amber-500/50')
+  })
+
   it('E-stop cancels the ramp and sets zero immediately', async () => {
     const w = mountCard()
     await segment(w, 9).trigger('click')

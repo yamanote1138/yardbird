@@ -128,7 +128,7 @@ import { PowerState } from 'jmri-client'
 import type { Throttle } from '@/types/jmri'
 import { Direction } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'
-import { createSpeedRamp, POWER_LEVELS } from '@/plugins/jmri/speedRamp'
+import { createSpeedRamp, POWER_LEVELS, AT_TARGET_TOLERANCE } from '@/plugins/jmri/speedRamp'
 import { logger } from '@/utils/logger'
 
 const props = defineProps<{
@@ -195,12 +195,12 @@ function getSpeedButtonClass(level: number, index: number): string {
   const previousLevel = index > 0 ? powerLevels[index - 1] : 0
 
   // Reached or passed this segment: BRIGHT
-  if (currentSpeed >= level) {
+  if (currentSpeed >= level - AT_TARGET_TOLERANCE) {
     return reached
   }
 
   // Between previous and this segment: DIM (approaching)
-  if (currentSpeed > previousLevel) {
+  if (currentSpeed > previousLevel + AT_TARGET_TOLERANCE) {
     return approaching
   }
 

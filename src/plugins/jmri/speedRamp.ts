@@ -7,7 +7,7 @@ const RAMP_INTERVAL = 100
 const MIN_DURATION = 200
 const MIN_STEPS = 5
 // Speed echoed back by JMRI can drift from what was sent (DCC step rounding)
-const AT_TARGET_TOLERANCE = 0.005
+export const AT_TARGET_TOLERANCE = 0.005
 
 interface SpeedRampOptions {
   getSpeed: () => number
