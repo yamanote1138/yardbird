@@ -58,6 +58,30 @@ describe('ThrottleCard ramping', () => {
     expect(throttle.speed).toBe(0.2)
   })
 
+  it('clicking a lit segment ramps down to that segment', async () => {
+    throttle.speed = 0.8
+    const w = mountCard()
+    await segment(w, 2).trigger('click')
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(throttle.speed).toBe(0.3)
+  })
+
+  it('clicking the first segment ramps to its speed, not to zero', async () => {
+    throttle.speed = 0.5
+    const w = mountCard()
+    await segment(w, 0).trigger('click')
+    await vi.advanceTimersByTimeAsync(15000)
+    expect(throttle.speed).toBe(0.1)
+  })
+
+  it('clicking the current segment does nothing', async () => {
+    throttle.speed = 0.4
+    const w = mountCard()
+    await segment(w, 3).trigger('click')
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(setThrottleSpeed).not.toHaveBeenCalled()
+  })
+
   it('brake interrupts a ramp and brings the loco to zero', async () => {
     const w = mountCard()
     await segment(w, 9).trigger('click')

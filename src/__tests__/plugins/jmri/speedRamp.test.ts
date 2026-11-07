@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { createSpeedRamp, targetForSegment, POWER_LEVELS } from '@/plugins/jmri/speedRamp'
+import { createSpeedRamp } from '@/plugins/jmri/speedRamp'
 
 function makeLoco(initial = 0) {
   const loco = { speed: initial, calls: [] as number[] }
@@ -10,20 +10,6 @@ function makeLoco(initial = 0) {
   })
   return { loco, ramp }
 }
-
-describe('targetForSegment', () => {
-  it('targets the clicked level when the segment is not lit', () => {
-    expect(targetForSegment(0.3, 6)).toBe(POWER_LEVELS[6])
-  })
-
-  it('steps down one level when the clicked segment is lit', () => {
-    expect(targetForSegment(0.8, 2)).toBe(POWER_LEVELS[1])
-  })
-
-  it('targets zero when the first segment is lit and clicked', () => {
-    expect(targetForSegment(0.5, 0)).toBe(0)
-  })
-})
 
 describe('createSpeedRamp', () => {
   beforeEach(() => { vi.useFakeTimers() })

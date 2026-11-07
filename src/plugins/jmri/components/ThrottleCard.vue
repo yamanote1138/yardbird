@@ -128,7 +128,7 @@ import { PowerState } from 'jmri-client'
 import type { Throttle } from '@/types/jmri'
 import { Direction } from '@/types/jmri'
 import LocomotiveHeader from './LocomotiveHeader.vue'
-import { createSpeedRamp, targetForSegment, POWER_LEVELS } from '@/plugins/jmri/speedRamp'
+import { createSpeedRamp, POWER_LEVELS } from '@/plugins/jmri/speedRamp'
 import { logger } from '@/utils/logger'
 
 const props = defineProps<{
@@ -231,7 +231,7 @@ let speedActions = 0
 
 function setPowerLevel(index: number) {
   speedActions++
-  ramp.rampTo(targetForSegment(props.throttle.speed, index))
+  ramp.rampTo(powerLevels[index])
 }
 
 async function toggleDirection() {

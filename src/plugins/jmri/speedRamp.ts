@@ -7,14 +7,6 @@ const RAMP_INTERVAL = 100
 const MIN_DURATION = 200
 const MIN_STEPS = 5
 
-// Clicking a lit segment steps down one level; clicking an unlit one goes to it
-export function targetForSegment(currentSpeed: number, index: number): number {
-  if (currentSpeed >= POWER_LEVELS[index]) {
-    return index === 0 ? 0 : POWER_LEVELS[index - 1]
-  }
-  return POWER_LEVELS[index]
-}
-
 interface SpeedRampOptions {
   getSpeed: () => number
   setSpeed: (speed: number) => Promise<void>
